@@ -27,8 +27,19 @@
             z-index: 999;
         }
 
-        h1 { text-align: center; color: #333; margin-bottom: 15px; }
-        .online-count { text-align: center; color: #666; font-size: 14px; margin-bottom: 10px; }
+        h1 { text-align: center; color: #333; margin-bottom: 10px; }
+        .online-count { text-align: center; color: #666; font-size: 14px; margin-bottom: 6px; }
+        .identity-tip {
+            text-align: center;
+            color: #2c3e50;
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .identity-tip.black { color: #1a1a1a; }
+        .identity-tip.white { color: #7f8c8d; }
+
         .game-info {
             background: #fff;
             padding: 15px;
@@ -49,8 +60,19 @@
         .status-white { background: #ecf0f1; color: #2c3e50; border: 1px solid #bdc3c7; }
 
         .player-stats { display: flex; justify-content: space-around; }
-        .stat { padding: 10px 20px; border-radius: 6px; transition: all 0.3s; }
+        .stat { padding: 10px 20px; border-radius: 6px; transition: all 0.3s; position: relative; }
         .stat.active { box-shadow: 0 0 0 2px #3498db; background: #f0f8ff; }
+        .stat.me::after {
+            content: "你";
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #e74c3c;
+            color: #fff;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
         .stat h3 { margin-bottom: 8px; }
         .stat.black h3 { color: #000; }
         .stat.white h3 { color: #666; }
@@ -69,7 +91,6 @@
             background-position: 20px 20px;
             border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            position: relative;
         }
         .cell {
             width: 40px;
@@ -204,7 +225,7 @@
         }
         .rps-btn:hover { border-color: #3498db; background: #f0f8ff; }
 
-        #buff-modal .modal-content button {
+        #buff-modal button {
             display: block;
             width: 100%;
             margin: 10px 0;
@@ -216,29 +237,30 @@
             font-size: 14px;
             cursor: pointer;
         }
-        #buff-modal .modal-content button:hover { background: #2980b9; }
+        #buff-modal button:hover { background: #2980b9; }
     </style>
 </head>
 <body>
     <div class="watermark">刘</div>
 
     <div class="container">
-        <h1>技能五子棋 · 单技能模式</h1>
-        <div class="online-count" id="onlineCount">当前在线人数：加载中...</div>
+        <h1>技能五子棋</h1>
+        <div class="online-count" id="onlineCount">累计游玩人次：加载中...</div>
+        <div class="identity-tip" id="identityTip"></div>
         <div class="game-info">
             <div id="status" class="status-black">请选择游戏模式</div>
             <div class="player-stats">
                 <div id="stat-black" class="stat black">
                     <h3>黑方（先手）</h3>
-                    <p>所选技能：<span id="black-skill-name">未选择</span></p>
-                    <p>剩余次数：<span id="black-skill-count">-</span></p>
-                    <p id="black-sediment-text" style="display:none;">沉淀层数：<span id="black-sediment">0</span>层</p>
+                    <p>技能：<span id="black-skill-name">未选择</span></p>
+                    <p>次数：<span id="black-skill-count">-</span></p>
+                    <p id="black-sediment-text" style="display:none;">沉淀：<span id="black-sediment">0</span>层</p>
                 </div>
                 <div id="stat-white" class="stat white">
                     <h3>白方（后手）</h3>
-                    <p>所选技能：<span id="white-skill-name">未选择</span></p>
-                    <p>剩余次数：<span id="white-skill-count">-</span></p>
-                    <p id="white-sediment-text" style="display:none;">沉淀层数：<span id="white-sediment">0</span>层</p>
+                    <p>技能：<span id="white-skill-name">未选择</span></p>
+                    <p>次数：<span id="white-skill-count">-</span></p>
+                    <p id="white-sediment-text" style="display:none;">沉淀：<span id="white-sediment">0</span>层</p>
                 </div>
             </div>
         </div>
@@ -262,9 +284,9 @@
             <h3>选择游戏模式</h3>
             <div class="mode-options">
                 <button class="mode-btn" data-mode="local">本地双人对战</button>
-                <button class="mode-btn" data-mode="ai">人机对战（你执黑先手）</button>
-                <button class="mode-btn" data-mode="create">联机对战 - 创建房间</button>
-                <button class="mode-btn" data-mode="join">联机对战 - 加入房间</button>
+                <button class="mode-btn" data-mode="ai">人机对战（你执黑）</button>
+                <button class="mode-btn" data-mode="create">联机对战 - 创建房间（你执黑）</button>
+                <button class="mode-btn" data-mode="join">联机对战 - 加入房间（你执白）</button>
             </div>
             <div id="room-create-area" style="display: none; margin-top: 15px;">
                 <p>你的房间号：</p>
@@ -281,7 +303,7 @@
     <!-- 技能选择弹窗 -->
     <div id="skill-select-modal" class="modal">
         <div class="modal-content" style="min-width: 520px;">
-            <h3 id="select-prompt">黑方请选择你的技能</h3>
+            <h3 id="select-prompt">选择你的技能</h3>
             <div class="skill-options">
                 <div class="skill-option" data-skill="blast">
                     <h4>爆破专家</h4>
@@ -311,7 +333,7 @@
     <div id="gambler-modal" class="modal">
         <div class="modal-content">
             <h3>剪刀石头布</h3>
-            <p id="gambler-prompt">请当前玩家选择</p>
+            <p id="gambler-prompt">请选择出拳</p>
             <div class="rps-buttons">
                 <button class="rps-btn" data-choice="rock">✊ 石头</button>
                 <button class="rps-btn" data-choice="scissors">✌️ 剪刀</button>
@@ -356,6 +378,35 @@
                 .catch(() => document.getElementById("onlineCount").textContent = "在线人数加载失败");
         }
 
+        // 显示身份标注
+        function showIdentity() {
+            const tip = document.getElementById("identityTip");
+            if (gameMode === "online") {
+                tip.style.display = "block";
+                if (isOnlineHost) {
+                    tip.textContent = "你是黑方（先手）";
+                    tip.className = "identity-tip black";
+                    document.getElementById("stat-black").classList.add("me");
+                    document.getElementById("stat-white").classList.remove("me");
+                } else {
+                    tip.textContent = "你是白方（后手）";
+                    tip.className = "identity-tip white";
+                    document.getElementById("stat-white").classList.add("me");
+                    document.getElementById("stat-black").classList.remove("me");
+                }
+            } else if (gameMode === "ai") {
+                tip.style.display = "block";
+                tip.textContent = "你是黑方（先手）";
+                tip.className = "identity-tip black";
+                document.getElementById("stat-black").classList.add("me");
+                document.getElementById("stat-white").classList.remove("me");
+            } else {
+                tip.style.display = "none";
+                document.getElementById("stat-black").classList.remove("me");
+                document.getElementById("stat-white").classList.remove("me");
+            }
+        }
+
         // 模式选择
         document.querySelectorAll(".mode-btn[data-mode]").forEach(btn => {
             btn.addEventListener("click", () => {
@@ -363,6 +414,7 @@
                 gameMode = mode;
                 if (mode === "local" || mode === "ai") {
                     document.getElementById("mode-modal").style.display = "none";
+                    showIdentity();
                     startSkillSelect();
                 } else if (mode === "create") {
                     if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新重试");
@@ -377,6 +429,7 @@
         // 联机功能
         function createOnlineRoom() {
             isOnlineHost = true;
+            gameMode = "online";
             peer = new Peer();
             peer.on("open", id => {
                 document.getElementById("room-create-area").style.display = "block";
@@ -386,6 +439,7 @@
                 connection = conn;
                 setupConnectionHandlers();
                 document.getElementById("mode-modal").style.display = "none";
+                showIdentity();
                 startSkillSelect();
             });
             peer.on("error", err => alert("房间创建失败：" + err.type));
@@ -395,12 +449,14 @@
             const roomId = document.getElementById("joinRoomId").value.trim();
             if (!roomId) return alert("请输入房间号");
             isOnlineHost = false;
+            gameMode = "online";
             peer = new Peer();
             peer.on("open", () => {
                 connection = peer.connect(roomId);
                 connection.on("open", () => {
                     setupConnectionHandlers();
                     document.getElementById("mode-modal").style.display = "none";
+                    showIdentity();
                     startSkillSelect();
                 });
             });
@@ -412,16 +468,25 @@
                 if (data.type === "move") handleRemoteMove(data.x, data.y);
                 else if (data.type === "skill") handleRemoteSkill(data.skill, data.payload);
                 else if (data.type === "skillSelect") {
-                    playerData[isOnlineHost ? WHITE : BLACK].skill = data.skill;
-                    setSkillInitialCount(isOnlineHost ? WHITE : BLACK, data.skill);
-                    gamePhase = "normal";
-                    finishSkillSelectSetup();
+                    // 接收对方技能，后台更新，不弹窗
+                    const opponent = isOnlineHost ? WHITE : BLACK;
+                    playerData[opponent].skill = data.skill;
+                    setSkillInitialCount(opponent, data.skill);
+                    updateUI();
+                    // 双方都选完则开始游戏
+                    const myPlayer = isOnlineHost ? BLACK : WHITE;
+                    if (playerData[myPlayer].skill && gamePhase === "skillSelect") {
+                        document.getElementById("skill-select-modal").style.display = "none";
+                        gamePhase = "normal";
+                        finishSkillSelectSetup();
+                    }
                 }
             });
         }
 
         function sendMove(x, y) { if (connection) connection.send({ type: "move", x, y }); }
         function sendSkill(skillName, payload) { if (connection) connection.send({ type: "skill", skill: skillName, payload }); }
+        
         function handleRemoteMove(x, y) {
             if (gamePhase === "normal") handleNormalDrop(x, y);
             else if (gamePhase === "sedimentBurst") handleSedimentDrop(x, y);
@@ -462,41 +527,51 @@
         function startSkillSelect() {
             gamePhase = "skillSelect";
             document.getElementById("skill-select-modal").style.display = "flex";
-            document.getElementById("select-prompt").textContent = 
-                gameMode === "ai" || (gameMode === "online" && !isOnlineHost) ? "请选择你的技能" : "黑方请选择你的技能";
+            
+            let prompt = "黑方请选择技能";
+            if (gameMode === "ai") prompt = "请选择你的技能（执黑先手）";
+            else if (gameMode === "online") prompt = isOnlineHost ? "请选择你的技能（黑方）" : "请选择你的技能（白方）";
+            document.getElementById("select-prompt").textContent = prompt;
         }
 
         // 技能选择
         document.querySelectorAll(".skill-option").forEach(option => {
             option.addEventListener("click", () => {
                 const skillId = option.dataset.skill;
+                
                 if (gameMode === "ai") {
                     playerData[BLACK].skill = skillId;
                     setSkillInitialCount(BLACK, skillId);
+                    // AI随机技能（排除赌徒）
                     const aiSkills = ["blast", "copy", "sediment"];
-                    const aiSkill = aiSkills[Math.floor(Math.random() * aiSkills.length)];
-                    playerData[WHITE].skill = aiSkill;
-                    setSkillInitialCount(WHITE, aiSkill);
+                    playerData[WHITE].skill = aiSkills[Math.floor(Math.random() * aiSkills.length)];
+                    setSkillInitialCount(WHITE, playerData[WHITE].skill);
                     document.getElementById("skill-select-modal").style.display = "none";
                     gamePhase = "normal";
                     finishSkillSelectSetup();
                 } else if (gameMode === "online") {
+                    // 联机：仅选自己的，发出去，然后等待
                     const myPlayer = isOnlineHost ? BLACK : WHITE;
                     playerData[myPlayer].skill = skillId;
                     setSkillInitialCount(myPlayer, skillId);
                     connection.send({ type: "skillSelect", skill: skillId });
-                    if (isOnlineHost) {
-                        document.getElementById("select-prompt").textContent = "等待对方选择技能...";
-                    } else {
+                    updateUI();
+                    
+                    document.getElementById("select-prompt").textContent = "已选择完成，等待对方选择技能...";
+                    
+                    // 若对方已先选完，直接开始
+                    const opponent = isOnlineHost ? WHITE : BLACK;
+                    if (playerData[opponent].skill) {
                         document.getElementById("skill-select-modal").style.display = "none";
                         gamePhase = "normal";
                         finishSkillSelectSetup();
                     }
                 } else {
+                    // 本地双人：依次选择
                     if (!playerData[BLACK].skill) {
                         playerData[BLACK].skill = skillId;
                         setSkillInitialCount(BLACK, skillId);
-                        document.getElementById("select-prompt").textContent = "白方请选择你的技能";
+                        document.getElementById("select-prompt").textContent = "白方请选择技能";
                         updateUI();
                     } else if (!playerData[WHITE].skill) {
                         playerData[WHITE].skill = skillId;
@@ -530,11 +605,13 @@
         function refreshSkillButton() {
             document.querySelectorAll(".skill-btn").forEach(btn => btn.style.display = "none");
             let showPlayer = currentPlayer;
+            
             if (gameMode === "online") {
                 const myPlayer = isOnlineHost ? BLACK : WHITE;
                 if (currentPlayer !== myPlayer) return;
                 showPlayer = myPlayer;
             } else if (gameMode === "ai" && currentPlayer === WHITE) return;
+            
             const skill = playerData[showPlayer].skill;
             if (skill && SKILL_BTN_MAP[skill]) {
                 document.getElementById(SKILL_BTN_MAP[skill]).style.display = "block";
@@ -544,8 +621,10 @@
         // 落子入口
         function handleCellClick(x, y) {
             if (gameOver || gamePhase === "skillSelect" || gamePhase === "modeSelect") return;
+            // 联机/人机：非己方回合禁止操作
             if (gameMode === "online" && currentPlayer !== (isOnlineHost ? BLACK : WHITE)) return;
             if (gameMode === "ai" && currentPlayer === WHITE) return;
+            
             switch (gamePhase) {
                 case "normal": handleNormalDrop(x, y); break;
                 case "placingBlast": handleBlastPlacement(x, y); break;
@@ -678,9 +757,8 @@
 
         // 回合结束
         function endTurn() {
-            blastMarkers.forEach(marker => {
-                if (marker.owner !== currentPlayer) marker.remainingMoves--;
-            });
+            // 爆破倒计时
+            blastMarkers.forEach(m => { if (m.owner !== currentPlayer) m.remainingMoves--; });
             blastMarkers.filter(m => m.remainingMoves <= 0).forEach(m => triggerBlast(m.x, m.y));
             blastMarkers = blastMarkers.filter(m => m.remainingMoves > 0);
 
@@ -729,8 +807,8 @@
             const aiSkill = playerData[WHITE].skill;
 
             if (aiSkill === "blast" && playerData[WHITE].skillCount > 0) {
-                const blastPos = findBestBlastPosition();
-                if (blastPos) return handleBlastPlacement(blastPos.x, blastPos.y);
+                const pos = findBestBlastPosition();
+                if (pos) return handleBlastPlacement(pos.x, pos.y);
             }
 
             if (aiSkill === "sediment" && playerData[WHITE].sedimentLayers < 2 && countTotalPieces() > 10) {
@@ -742,6 +820,7 @@
                 }
             }
 
+            // 估值落子
             let bestScore = -Infinity, bestMoves = [];
             for (let y = 0; y < BOARD_SIZE; y++) {
                 for (let x = 0; x < BOARD_SIZE; x++) {
@@ -751,7 +830,7 @@
                     else if (score === bestScore) bestMoves.push({x, y});
                 }
             }
-            if (bestMoves.length > 0) {
+            if (bestMoves.length) {
                 const move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
                 handleNormalDrop(move.x, move.y);
             }
@@ -759,7 +838,7 @@
 
         function evaluatePosition(x, y, player) {
             const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
-            let totalScore = 0;
+            let total = 0;
             for (const [dx, dy] of directions) {
                 let count = 1, blocked = 0;
                 let nx = x + dx, ny = y + dy;
@@ -779,48 +858,44 @@
                 }
                 if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) blocked++;
 
-                if (count >= 5) totalScore += 100000;
-                else if (count === 4 && blocked === 0) totalScore += 10000;
-                else if (count === 4 && blocked === 1) totalScore += 1000;
-                else if (count === 3 && blocked === 0) totalScore += 1000;
-                else if (count === 3 && blocked === 1) totalScore += 100;
-                else if (count === 2 && blocked === 0) totalScore += 100;
-                else if (count === 2 && blocked === 1) totalScore += 10;
+                if (count >= 5) total += 100000;
+                else if (count === 4 && blocked === 0) total += 10000;
+                else if (count === 4 && blocked === 1) total += 1000;
+                else if (count === 3 && blocked === 0) total += 1000;
+                else if (count === 3 && blocked === 1) total += 100;
+                else if (count === 2 && blocked === 0) total += 100;
+                else if (count === 2 && blocked === 1) total += 10;
             }
-            totalScore += (14 - Math.abs(x - 7) - Math.abs(y - 7)) * 2;
-            return totalScore;
+            total += (14 - Math.abs(x - 7) - Math.abs(y - 7)) * 2;
+            return total;
         }
 
         function findBestBlastPosition() {
-            let maxThreat = 0, bestPos = null;
+            let max = 0, best = null;
             for (let y = 1; y < BOARD_SIZE - 1; y++) {
                 for (let x = 1; x < BOARD_SIZE - 1; x++) {
                     if (board[y][x] !== EMPTY) continue;
-                    let blackCount = 0;
+                    let cnt = 0;
                     for (let dy = -1; dy <= 1; dy++)
                         for (let dx = -1; dx <= 1; dx++)
-                            if (board[y+dy][x+dx] === BLACK) blackCount++;
-                    if (blackCount >= 3 && blackCount > maxThreat) {
-                        maxThreat = blackCount;
-                        bestPos = {x, y};
-                    }
+                            if (board[y+dy][x+dx] === BLACK) cnt++;
+                    if (cnt >= 3 && cnt > max) { max = cnt; best = {x, y}; }
                 }
             }
-            return bestPos;
+            return best;
         }
 
         // 渲染
         function renderBoard() {
-            const cells = document.querySelectorAll(".cell");
-            cells.forEach(cell => {
-                const x = parseInt(cell.dataset.x), y = parseInt(cell.dataset.y);
+            document.querySelectorAll(".cell").forEach(cell => {
+                const x = +cell.dataset.x, y = +cell.dataset.y;
                 cell.className = "cell";
                 cell.textContent = "";
                 if (board[y][x] === BLACK) cell.classList.add("black-piece");
                 else if (board[y][x] === WHITE) cell.classList.add("white-piece");
-                const marker = blastMarkers.find(m => m.x === x && m.y === y);
-                if (marker) { cell.classList.add("blast-marker"); cell.textContent = marker.remainingMoves; }
-                if (selectedCopySource.some(pos => pos.x === x && pos.y === y)) cell.classList.add("selected");
+                const m = blastMarkers.find(m => m.x === x && m.y === y);
+                if (m) { cell.classList.add("blast-marker"); cell.textContent = m.remainingMoves; }
+                if (selectedCopySource.some(p => p.x === x && p.y === y)) cell.classList.add("selected");
             });
         }
 
@@ -836,19 +911,19 @@
             document.getElementById("stat-black").classList.toggle("active", currentPlayer === BLACK);
             document.getElementById("stat-white").classList.toggle("active", currentPlayer === WHITE);
 
-            const currentSkill = playerData[currentPlayer].skill;
-            if (currentSkill && SKILL_BTN_MAP[currentSkill]) {
-                const btn = document.getElementById(SKILL_BTN_MAP[currentSkill]);
-                btn.disabled = currentSkill === "sediment" 
+            const skill = playerData[currentPlayer].skill;
+            if (skill && SKILL_BTN_MAP[skill]) {
+                const btn = document.getElementById(SKILL_BTN_MAP[skill]);
+                btn.disabled = skill === "sediment" 
                     ? playerData[currentPlayer].sedimentLayers >= 3 || gamePhase !== "normal"
                     : playerData[currentPlayer].skillCount <= 0 || gamePhase !== "normal";
             }
         }
 
         function updateStatus(text) {
-            const statusEl = document.getElementById("status");
-            statusEl.textContent = text;
-            statusEl.className = currentPlayer === BLACK ? "status-black" : "status-white";
+            const el = document.getElementById("status");
+            el.textContent = text;
+            el.className = currentPlayer === BLACK ? "status-black" : "status-white";
         }
 
         function endGame(winner) {
@@ -858,9 +933,9 @@
         }
 
         function countTotalPieces() {
-            let count = 0;
-            board.forEach(row => row.forEach(c => { if (c !== EMPTY) count++; }));
-            return count;
+            let cnt = 0;
+            board.forEach(row => row.forEach(c => { if (c !== EMPTY) cnt++; }));
+            return cnt;
         }
 
         function isBoardEmpty() { return countTotalPieces() === 0; }
@@ -901,9 +976,10 @@
             if (playerData[currentPlayer].skillCount <= 0) return;
             const total = countTotalPieces();
             if ((currentPlayer === BLACK && total < 2) || (currentPlayer === WHITE && total < 1)) return updateStatus("开局阶段禁止使用赌徒技能");
+            
             gamblerState = { active: true, initiator: currentPlayer, initiatorChoice: null, opponentChoice: null, drawCount: 0 };
             document.getElementById("gambler-modal").style.display = "flex";
-            document.getElementById("gambler-prompt").textContent = `${currentPlayer === BLACK ? "黑方" : "白方"}请选择出拳`;
+            document.getElementById("gambler-prompt").textContent = "请选择出拳";
         });
 
         document.querySelectorAll(".rps-btn").forEach(btn => {
@@ -911,6 +987,15 @@
                 const choice = btn.dataset.choice;
                 if (!gamblerState.initiatorChoice) {
                     gamblerState.initiatorChoice = choice;
+                    
+                    // AI模式自动出拳
+                    if (gameMode === "ai" && gamblerState.initiator === BLACK) {
+                        const options = ["rock", "scissors", "paper"];
+                        gamblerState.opponentChoice = options[Math.floor(Math.random() * 3)];
+                        resolveGambler();
+                        return;
+                    }
+                    
                     const opponent = gamblerState.initiator === BLACK ? "白方" : "黑方";
                     document.getElementById("gambler-prompt").textContent = `${opponent}请选择出拳`;
                 } else {
@@ -932,17 +1017,17 @@
                 }
                 alert("平局！重新出拳");
                 gamblerState.initiatorChoice = gamblerState.opponentChoice = null;
-                document.getElementById("gambler-prompt").textContent = `平局！${initiator === BLACK ? "黑方" : "白方"}请重新选择`;
+                document.getElementById("gambler-prompt").textContent = "平局！请重新选择";
                 return;
             }
 
             const winMap = { rock: "scissors", scissors: "paper", paper: "rock" };
-            const initiatorWins = winMap[initiatorChoice] === opponentChoice;
+            const win = winMap[initiatorChoice] === opponentChoice;
             document.getElementById("gambler-modal").style.display = "none";
             gamblerState.active = false;
             playerData[initiator].skillCount--;
 
-            if (initiatorWins) {
+            if (win) {
                 window.currentBuffPlayer = initiator;
                 document.getElementById("buff-modal").style.display = "flex";
             } else {
@@ -961,8 +1046,8 @@
         document.getElementById("buff-restore-skill").addEventListener("click", () => {
             const player = window.currentBuffPlayer;
             const skill = playerData[player].skill;
-            const maxCount = skill === "blast" ? (player === BLACK ? 3 : 4) : 2;
-            if (playerData[player].skillCount < maxCount) {
+            const max = skill === "blast" ? (player === BLACK ? 3 : 4) : 2;
+            if (playerData[player].skillCount < max) {
                 playerData[player].skillCount++;
                 updateStatus(`赌徒胜利！恢复1次${SKILL_NAMES[skill]}次数`);
             } else {
@@ -1000,11 +1085,13 @@
 
         document.getElementById("restart").addEventListener("click", () => {
             if (peer) { peer.destroy(); peer = null; connection = null; }
+            document.getElementById("identityTip").style.display = "none";
             document.getElementById("mode-modal").style.display = "flex";
             document.getElementById("room-create-area").style.display = "none";
             document.getElementById("room-join-area").style.display = "none";
             document.getElementById("joinRoomId").value = "";
             gamePhase = "modeSelect";
+            gameMode = "local";
             initBoard();
             updateStatus("请选择游戏模式");
         });
