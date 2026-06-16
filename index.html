@@ -177,6 +177,8 @@
         .mode-options { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
         .mode-btn { display: block; width: 100%; background: #3498db; color: #fff; padding: 14px; font-size: 16px; }
         .mode-btn:hover { background: #2980b9; }
+        .mode-btn.random { background: #9b59b6; }
+        .mode-btn.random:hover { background: #8e44ad; }
         .room-input {
             width: 100%;
             padding: 10px;
@@ -193,6 +195,13 @@
             letter-spacing: 2px;
             user-select: all;
         }
+        .matching-tip {
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+            display: none;
+        }
+        .matching-tip.show { display: block; }
 
         .skill-options {
             display: grid;
@@ -285,6 +294,7 @@
             <div class="mode-options">
                 <button class="mode-btn" data-mode="local">本地双人对战</button>
                 <button class="mode-btn" data-mode="ai">人机对战（你执黑）</button>
+                <button class="mode-btn random" data-mode="random">联机随机匹配</button>
                 <button class="mode-btn" data-mode="create">联机对战 - 创建房间（你执黑）</button>
                 <button class="mode-btn" data-mode="join">联机对战 - 加入房间（你执白）</button>
             </div>
@@ -297,6 +307,7 @@
                 <input type="text" class="room-input" id="joinRoomId" placeholder="请输入对方房间号">
                 <button class="mode-btn" id="confirmJoinBtn">加入房间</button>
             </div>
+            <div class="matching-tip" id="matchingTip">正在匹配对手，请稍候...</div>
         </div>
     </div>
 
@@ -356,6 +367,7 @@
         const EMPTY = 0, BLACK = 1, WHITE = 2;
         const SKILL_NAMES = { blast: "爆破专家", copy: "复制", sediment: "沉淀", gambler: "赌徒" };
         const SKILL_BTN_MAP = { blast: "skill-blast", copy: "skill-copy", sediment: "skill-sediment", gambler: "skill-gambler" };
+        const MATCH_NAMESPACE = "gomoku-skill-match-queue";
 
         let gameMode = "local", isOnlineHost = false, peer = null, connection = null;
         let board = [], currentPlayer = BLACK, gameOver = false, gamePhase = "modeSelect";
@@ -411,6 +423,10 @@
         document.querySelectorAll(".mode-btn[data-mode]").forEach(btn => {
             btn.addEventListener("click", () => {
                 const mode = btn.dataset.mode;
+                if (mode === "random") {
+                    startRandomMatch();
+                    return;
+                }
                 gameMode = mode;
                 if (mode === "local" || mode === "ai") {
                     document.getElementById("mode-modal").style.display = "none";
@@ -425,6 +441,77 @@
                 }
             });
         });
+
+        // ========== 随机匹配机制 ==========
+        async function startRandomMatch() {
+            if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新重试");
+            document.getElementById("matchingTip").classList.add("show");
+            
+            try {
+                // 获取匹配队列序号
+                const res = await fetch(`https://api.countapi.xyz/hit/${MATCH_NAMESPACE}/queue`);
+                const data = await res.json();
+                const queueNum = data.value;
+                const roomId = `match-${Math.floor((queueNum + 1) / 2)}`;
+
+                if (queueNum % 2 === 1) {
+                    // 奇数位：创建房间等待
+                    isOnlineHost = true;
+                    gameMode = "online";
+                    peer = new Peer(roomId);
+                    peer.on("open", () => {
+                        document.getElementById("myRoomId").textContent = roomId;
+                        document.getElementById("room-create-area").style.display = "block";
+                    });
+                    peer.on("connection", conn => {
+                        connection = conn;
+                        setupConnectionHandlers();
+                        document.getElementById("matchingTip").classList.remove("show");
+                        document.getElementById("mode-modal").style.display = "none";
+                        showIdentity();
+                        startSkillSelect();
+                    });
+                    peer.on("error", err => {
+                        // 房间已存在则改为加入
+                        if (err.type === "unavailable-id") {
+                            joinMatchRoom(roomId);
+                        } else {
+                            alert("匹配失败：" + err.type);
+                            document.getElementById("matchingTip").classList.remove("show");
+                        }
+                    });
+                } else {
+                    // 偶数位：加入上一个房间
+                    joinMatchRoom(roomId);
+                }
+            } catch (e) {
+                alert("匹配服务异常，请稍后重试");
+                document.getElementById("matchingTip").classList.remove("show");
+            }
+        }
+
+        function joinMatchRoom(roomId) {
+            isOnlineHost = false;
+            gameMode = "online";
+            peer = new Peer();
+            peer.on("open", () => {
+                connection = peer.connect(roomId);
+                connection.on("open", () => {
+                    document.getElementById("matchingTip").classList.remove("show");
+                    document.getElementById("mode-modal").style.display = "none";
+                    showIdentity();
+                    startSkillSelect();
+                });
+                connection.on("error", () => {
+                    alert("匹配失败，对手已离开，请重新匹配");
+                    document.getElementById("matchingTip").classList.remove("show");
+                });
+            });
+            peer.on("error", err => {
+                alert("匹配失败：" + err.type);
+                document.getElementById("matchingTip").classList.remove("show");
+            });
+        }
 
         // 联机功能
         function createOnlineRoom() {
@@ -468,18 +555,22 @@
                 if (data.type === "move") handleRemoteMove(data.x, data.y);
                 else if (data.type === "skill") handleRemoteSkill(data.skill, data.payload);
                 else if (data.type === "skillSelect") {
-                    // 接收对方技能，后台更新，不弹窗
                     const opponent = isOnlineHost ? WHITE : BLACK;
                     playerData[opponent].skill = data.skill;
                     setSkillInitialCount(opponent, data.skill);
                     updateUI();
-                    // 双方都选完则开始游戏
                     const myPlayer = isOnlineHost ? BLACK : WHITE;
                     if (playerData[myPlayer].skill && gamePhase === "skillSelect") {
                         document.getElementById("skill-select-modal").style.display = "none";
                         gamePhase = "normal";
                         finishSkillSelectSetup();
                     }
+                }
+            });
+            connection.on("close", () => {
+                if (!gameOver) {
+                    alert("对手已断开连接");
+                    document.getElementById("restart").click();
                 }
             });
         }
@@ -542,7 +633,6 @@
                 if (gameMode === "ai") {
                     playerData[BLACK].skill = skillId;
                     setSkillInitialCount(BLACK, skillId);
-                    // AI随机技能（排除赌徒）
                     const aiSkills = ["blast", "copy", "sediment"];
                     playerData[WHITE].skill = aiSkills[Math.floor(Math.random() * aiSkills.length)];
                     setSkillInitialCount(WHITE, playerData[WHITE].skill);
@@ -550,7 +640,6 @@
                     gamePhase = "normal";
                     finishSkillSelectSetup();
                 } else if (gameMode === "online") {
-                    // 联机：仅选自己的，发出去，然后等待
                     const myPlayer = isOnlineHost ? BLACK : WHITE;
                     playerData[myPlayer].skill = skillId;
                     setSkillInitialCount(myPlayer, skillId);
@@ -559,7 +648,6 @@
                     
                     document.getElementById("select-prompt").textContent = "已选择完成，等待对方选择技能...";
                     
-                    // 若对方已先选完，直接开始
                     const opponent = isOnlineHost ? WHITE : BLACK;
                     if (playerData[opponent].skill) {
                         document.getElementById("skill-select-modal").style.display = "none";
@@ -567,7 +655,6 @@
                         finishSkillSelectSetup();
                     }
                 } else {
-                    // 本地双人：依次选择
                     if (!playerData[BLACK].skill) {
                         playerData[BLACK].skill = skillId;
                         setSkillInitialCount(BLACK, skillId);
@@ -621,7 +708,6 @@
         // 落子入口
         function handleCellClick(x, y) {
             if (gameOver || gamePhase === "skillSelect" || gamePhase === "modeSelect") return;
-            // 联机/人机：非己方回合禁止操作
             if (gameMode === "online" && currentPlayer !== (isOnlineHost ? BLACK : WHITE)) return;
             if (gameMode === "ai" && currentPlayer === WHITE) return;
             
@@ -757,7 +843,6 @@
 
         // 回合结束
         function endTurn() {
-            // 爆破倒计时
             blastMarkers.forEach(m => { if (m.owner !== currentPlayer) m.remainingMoves--; });
             blastMarkers.filter(m => m.remainingMoves <= 0).forEach(m => triggerBlast(m.x, m.y));
             blastMarkers = blastMarkers.filter(m => m.remainingMoves > 0);
@@ -820,7 +905,6 @@
                 }
             }
 
-            // 估值落子
             let bestScore = -Infinity, bestMoves = [];
             for (let y = 0; y < BOARD_SIZE; y++) {
                 for (let x = 0; x < BOARD_SIZE; x++) {
@@ -988,7 +1072,6 @@
                 if (!gamblerState.initiatorChoice) {
                     gamblerState.initiatorChoice = choice;
                     
-                    // AI模式自动出拳
                     if (gameMode === "ai" && gamblerState.initiator === BLACK) {
                         const options = ["rock", "scissors", "paper"];
                         gamblerState.opponentChoice = options[Math.floor(Math.random() * 3)];
@@ -1074,7 +1157,7 @@
             updateUI();
         }
 
-        // 取消技能 & 返回菜单
+        // 取消技能
         document.getElementById("cancel-skill").addEventListener("click", () => {
             if (gamePhase === "normal" || gamePhase === "skillSelect" || gamePhase === "modeSelect") return;
             gamePhase = "normal";
@@ -1083,9 +1166,11 @@
             updateStatus(`已取消技能，当前回合：${currentPlayer === BLACK ? "黑方" : "白方"}`);
         });
 
+        // 返回主菜单
         document.getElementById("restart").addEventListener("click", () => {
             if (peer) { peer.destroy(); peer = null; connection = null; }
             document.getElementById("identityTip").style.display = "none";
+            document.getElementById("matchingTip").classList.remove("show");
             document.getElementById("mode-modal").style.display = "flex";
             document.getElementById("room-create-area").style.display = "none";
             document.getElementById("room-join-area").style.display = "none";
