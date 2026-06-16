@@ -6,11 +6,7 @@
     <title>技能五子棋</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: "Microsoft YaHei", sans-serif;
             background: #f0f2f5;
@@ -19,60 +15,20 @@
             padding: 20px;
             min-height: 100vh;
         }
-        .container {
-            max-width: 950px;
-            width: 100%;
-            opacity: 0;
-            transition: opacity 0.8s ease;
-            display: none;
-        }
-        .container.show {
-            opacity: 1;
-            display: block;
-        }
-
-        /* 开场大字动画 - 修复层级与消失逻辑 */
-        .splash-screen {
+        .container { max-width: 950px; width: 100%; }
+        .watermark {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #1a1a2e;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            pointer-events: none;
-        }
-        .splash-title {
-            font-size: 120px;
+            right: 24px;
+            bottom: 20px;
+            font-size: 28px;
             font-weight: bold;
-            color: #fff;
-            letter-spacing: 20px;
-            transform: scale(0.5);
-            opacity: 0;
-            animation: splashAnim 2.5s ease forwards;
-            text-shadow: 0 0 30px rgba(52, 152, 219, 0.8);
-        }
-        @keyframes splashAnim {
-            0% { transform: scale(0.5); opacity: 0; }
-            50% { transform: scale(1.1); opacity: 1; }
-            80% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(1.2); opacity: 0; }
+            color: rgba(0, 0, 0, 0.15);
+            pointer-events: none;
+            z-index: 999;
         }
 
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 15px;
-        }
-        .online-count {
-            text-align: center;
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
+        h1 { text-align: center; color: #333; margin-bottom: 15px; }
+        .online-count { text-align: center; color: #666; font-size: 14px; margin-bottom: 10px; }
         .game-info {
             background: #fff;
             padding: 15px;
@@ -92,36 +48,15 @@
         .status-black { background: #1a1a1a; color: #fff; }
         .status-white { background: #ecf0f1; color: #2c3e50; border: 1px solid #bdc3c7; }
 
-        .player-stats {
-            display: flex;
-            justify-content: space-around;
-        }
-        .stat {
-            padding: 10px 20px;
-            border-radius: 6px;
-            transition: all 0.3s;
-        }
-        .stat.active {
-            box-shadow: 0 0 0 2px #3498db;
-            background: #f0f8ff;
-        }
-        .stat h3 {
-            margin-bottom: 8px;
-        }
+        .player-stats { display: flex; justify-content: space-around; }
+        .stat { padding: 10px 20px; border-radius: 6px; transition: all 0.3s; }
+        .stat.active { box-shadow: 0 0 0 2px #3498db; background: #f0f8ff; }
+        .stat h3 { margin-bottom: 8px; }
         .stat.black h3 { color: #000; }
         .stat.white h3 { color: #666; }
-        .stat p {
-            margin: 4px 0;
-            font-size: 14px;
-        }
-        .main {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
+        .stat p { margin: 4px 0; font-size: 14px; }
 
-        /* 交点式棋盘 */
+        .main { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
         .board {
             display: grid;
             grid-template-columns: repeat(15, 40px);
@@ -149,10 +84,7 @@
             font-weight: bold;
             z-index: 1;
         }
-        .cell:hover {
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-        }
+        .cell:hover { background: rgba(255,255,255,0.2); border-radius: 50%; }
         .cell.black-piece::before,
         .cell.white-piece::before {
             content: "";
@@ -171,14 +103,8 @@
             border: 1px solid #bbb;
             box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
         }
-        .cell.blast-marker {
-            background: rgba(255, 0, 0, 0.35);
-            border-radius: 4px;
-        }
-        .cell.selected {
-            background: rgba(0, 200, 0, 0.4);
-            border-radius: 4px;
-        }
+        .cell.blast-marker { background: rgba(255, 0, 0, 0.35); border-radius: 4px; }
+        .cell.selected { background: rgba(0, 200, 0, 0.4); border-radius: 4px; }
 
         .skills {
             display: flex;
@@ -190,10 +116,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             min-width: 160px;
         }
-        .skills h3 {
-            text-align: center;
-            margin-bottom: 10px;
-        }
+        .skills h3 { text-align: center; margin-bottom: 10px; }
         .skill-btn, .cancel-btn, .restart-btn, .mode-btn {
             padding: 10px;
             border: none;
@@ -203,44 +126,19 @@
             transition: background 0.2s;
             display: none;
         }
-        .skill-btn {
-            background: #3498db;
-            color: #fff;
-        }
-        .skill-btn:hover:not(:disabled) {
-            background: #2980b9;
-        }
-        .skill-btn:disabled {
-            background: #bdc3c7;
-            cursor: not-allowed;
-        }
-        .cancel-btn {
-            background: #e74c3c;
-            color: #fff;
-            margin-top: 10px;
-            display: block;
-        }
-        .cancel-btn:hover {
-            background: #c0392b;
-        }
-        .restart-btn {
-            background: #27ae60;
-            color: #fff;
-            margin-top: auto;
-            display: block;
-        }
-        .restart-btn:hover {
-            background: #229954;
-        }
+        .skill-btn { background: #3498db; color: #fff; }
+        .skill-btn:hover:not(:disabled) { background: #2980b9; }
+        .skill-btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+        .cancel-btn { background: #e74c3c; color: #fff; margin-top: 10px; display: block; }
+        .cancel-btn:hover { background: #c0392b; }
+        .restart-btn { background: #27ae60; color: #fff; margin-top: auto; display: block; }
+        .restart-btn:hover { background: #229954; }
 
-        /* 弹窗通用 */
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0,0,0,0.5);
             justify-content: center;
             align-items: center;
@@ -253,28 +151,11 @@
             text-align: center;
             min-width: 300px;
         }
-        .modal-content h3 {
-            margin-bottom: 20px;
-        }
+        .modal-content h3 { margin-bottom: 20px; }
 
-        /* 模式选择弹窗 */
-        .mode-options {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 20px;
-        }
-        .mode-btn {
-            display: block;
-            width: 100%;
-            background: #3498db;
-            color: #fff;
-            padding: 14px;
-            font-size: 16px;
-        }
-        .mode-btn:hover {
-            background: #2980b9;
-        }
+        .mode-options { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .mode-btn { display: block; width: 100%; background: #3498db; color: #fff; padding: 14px; font-size: 16px; }
+        .mode-btn:hover { background: #2980b9; }
         .room-input {
             width: 100%;
             padding: 10px;
@@ -292,7 +173,6 @@
             user-select: all;
         }
 
-        /* 技能选择弹窗 */
         .skill-options {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -307,32 +187,12 @@
             transition: all 0.2s;
             text-align: left;
         }
-        .skill-option:hover {
-            border-color: #3498db;
-            background: #f0f8ff;
-        }
-        .skill-option h4 {
-            margin-bottom: 8px;
-            color: #2c3e50;
-        }
-        .skill-option p {
-            font-size: 13px;
-            color: #666;
-            margin: 4px 0;
-        }
-        .skill-option .skill-count {
-            color: #e67e22;
-            font-weight: bold;
-            margin-top: 8px;
-        }
+        .skill-option:hover { border-color: #3498db; background: #f0f8ff; }
+        .skill-option h4 { margin-bottom: 8px; color: #2c3e50; }
+        .skill-option p { font-size: 13px; color: #666; margin: 4px 0; }
+        .skill-option .skill-count { color: #e67e22; font-weight: bold; margin-top: 8px; }
 
-        /* 猜拳弹窗 */
-        .rps-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-top: 20px;
-        }
+        .rps-buttons { display: flex; gap: 15px; justify-content: center; margin-top: 20px; }
         .rps-btn {
             padding: 15px 20px;
             font-size: 24px;
@@ -342,12 +202,8 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .rps-btn:hover {
-            border-color: #3498db;
-            background: #f0f8ff;
-        }
+        .rps-btn:hover { border-color: #3498db; background: #f0f8ff; }
 
-        /* 增益选择弹窗 */
         #buff-modal .modal-content button {
             display: block;
             width: 100%;
@@ -360,18 +216,13 @@
             font-size: 14px;
             cursor: pointer;
         }
-        #buff-modal .modal-content button:hover {
-            background: #2980b9;
-        }
+        #buff-modal .modal-content button:hover { background: #2980b9; }
     </style>
 </head>
 <body>
-    <!-- 开场大字动画 -->
-    <div class="splash-screen" id="splash">
-        <div class="splash-title">技能五子棋</div>
-    </div>
+    <div class="watermark">刘</div>
 
-    <div class="container" id="gameContainer">
+    <div class="container">
         <h1>技能五子棋 · 单技能模式</h1>
         <div class="online-count" id="onlineCount">当前在线人数：加载中...</div>
         <div class="game-info">
@@ -406,7 +257,7 @@
     </div>
 
     <!-- 模式选择弹窗 -->
-    <div id="mode-modal" class="modal">
+    <div id="mode-modal" class="modal" style="display: flex;">
         <div class="modal-content" style="min-width: 400px;">
             <h3>选择游戏模式</h3>
             <div class="mode-options">
@@ -469,7 +320,7 @@
         </div>
     </div>
 
-    <!-- 赌徒胜利增益选择弹窗 -->
+    <!-- 赌徒增益弹窗 -->
     <div id="buff-modal" class="modal">
         <div class="modal-content">
             <h3>赌徒胜利！选择增益</h3>
@@ -480,76 +331,29 @@
 
     <script>
         const BOARD_SIZE = 15;
-        const EMPTY = 0;
-        const BLACK = 1;
-        const WHITE = 2;
+        const EMPTY = 0, BLACK = 1, WHITE = 2;
+        const SKILL_NAMES = { blast: "爆破专家", copy: "复制", sediment: "沉淀", gambler: "赌徒" };
+        const SKILL_BTN_MAP = { blast: "skill-blast", copy: "skill-copy", sediment: "skill-sediment", gambler: "skill-gambler" };
 
-        const SKILL_NAMES = {
-            blast: "爆破专家",
-            copy: "复制",
-            sediment: "沉淀",
-            gambler: "赌徒"
-        };
-
-        const SKILL_BTN_MAP = {
-            blast: "skill-blast",
-            copy: "skill-copy",
-            sediment: "skill-sediment",
-            gambler: "skill-gambler"
-        };
-
-        let gameMode = "local";
-        let isOnlineHost = false;
-        let peer = null;
-        let connection = null;
-
-        let board = [];
-        let currentPlayer = BLACK;
-        let gameOver = false;
-        let gamePhase = "modeSelect";
-        let selectedCopySource = [];
-        let copyDirection = null;
-        let blastMarkers = [];
-        let extraPieceThisTurn = false;
-        let extraPieceUsed = false;
-        let gamblerState = {
-            active: false,
-            initiator: null,
-            initiatorChoice: null,
-            opponentChoice: null,
-            drawCount: 0
-        };
-
+        let gameMode = "local", isOnlineHost = false, peer = null, connection = null;
+        let board = [], currentPlayer = BLACK, gameOver = false, gamePhase = "modeSelect";
+        let selectedCopySource = [], copyDirection = null, blastMarkers = [];
+        let extraPieceThisTurn = false, extraPieceUsed = false;
+        let gamblerState = { active: false, initiator: null, initiatorChoice: null, opponentChoice: null, drawCount: 0 };
         const playerData = {
             [BLACK]: { skill: null, skillCount: 0, sedimentLayers: 0, remainingDrops: 0 },
             [WHITE]: { skill: null, skillCount: 0, sedimentLayers: 0, remainingDrops: 0 }
         };
 
-        // 开场动画 - 修复：DOM就绪即执行，不依赖外部资源
-        document.addEventListener("DOMContentLoaded", () => {
-            initBoard();
-            // 动画播放2.6秒后移除遮罩，显示主界面
-            setTimeout(() => {
-                const splash = document.getElementById("splash");
-                const container = document.getElementById("gameContainer");
-                splash.style.display = "none";
-                container.classList.add("show");
-                document.getElementById("mode-modal").style.display = "flex";
-                getOnlineCount();
-            }, 2600);
-        });
+        // 初始化
+        initBoard();
+        getOnlineCount();
 
-        // 在线人数统计
         function getOnlineCount() {
             fetch("https://api.countapi.xyz/hit/gomoku-skill-game/visitors")
                 .then(res => res.json())
-                .then(data => {
-                    document.getElementById("onlineCount").textContent = 
-                        `累计游玩人次：${data.value} 人`;
-                })
-                .catch(() => {
-                    document.getElementById("onlineCount").textContent = "在线人数加载失败";
-                });
+                .then(data => document.getElementById("onlineCount").textContent = `累计游玩人次：${data.value} 人`)
+                .catch(() => document.getElementById("onlineCount").textContent = "在线人数加载失败");
         }
 
         // 模式选择
@@ -557,13 +361,14 @@
             btn.addEventListener("click", () => {
                 const mode = btn.dataset.mode;
                 gameMode = mode;
-
                 if (mode === "local" || mode === "ai") {
                     document.getElementById("mode-modal").style.display = "none";
                     startSkillSelect();
                 } else if (mode === "create") {
+                    if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新重试");
                     createOnlineRoom();
                 } else if (mode === "join") {
+                    if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新重试");
                     document.getElementById("room-join-area").style.display = "block";
                 }
             });
@@ -583,17 +388,12 @@
                 document.getElementById("mode-modal").style.display = "none";
                 startSkillSelect();
             });
-            peer.on("error", err => {
-                alert("房间创建失败：" + err.type);
-            });
+            peer.on("error", err => alert("房间创建失败：" + err.type));
         }
 
         document.getElementById("confirmJoinBtn").addEventListener("click", () => {
             const roomId = document.getElementById("joinRoomId").value.trim();
-            if (!roomId) {
-                alert("请输入房间号");
-                return;
-            }
+            if (!roomId) return alert("请输入房间号");
             isOnlineHost = false;
             peer = new Peer();
             peer.on("open", () => {
@@ -604,18 +404,14 @@
                     startSkillSelect();
                 });
             });
-            peer.on("error", err => {
-                alert("加入失败：" + err.type);
-            });
+            peer.on("error", err => alert("加入失败：" + err.type));
         });
 
         function setupConnectionHandlers() {
             connection.on("data", data => {
-                if (data.type === "move") {
-                    handleRemoteMove(data.x, data.y);
-                } else if (data.type === "skill") {
-                    handleRemoteSkill(data.skill, data.payload);
-                } else if (data.type === "skillSelect") {
+                if (data.type === "move") handleRemoteMove(data.x, data.y);
+                else if (data.type === "skill") handleRemoteSkill(data.skill, data.payload);
+                else if (data.type === "skillSelect") {
                     playerData[isOnlineHost ? WHITE : BLACK].skill = data.skill;
                     setSkillInitialCount(isOnlineHost ? WHITE : BLACK, data.skill);
                     gamePhase = "normal";
@@ -624,32 +420,18 @@
             });
         }
 
-        function sendMove(x, y) {
-            if (connection) connection.send({ type: "move", x, y });
-        }
-
-        function sendSkill(skillName, payload) {
-            if (connection) connection.send({ type: "skill", skill: skillName, payload });
-        }
-
+        function sendMove(x, y) { if (connection) connection.send({ type: "move", x, y }); }
+        function sendSkill(skillName, payload) { if (connection) connection.send({ type: "skill", skill: skillName, payload }); }
         function handleRemoteMove(x, y) {
-            if (gamePhase === "normal") {
-                handleNormalDrop(x, y);
-            } else if (gamePhase === "sedimentBurst") {
-                handleSedimentDrop(x, y);
-            }
+            if (gamePhase === "normal") handleNormalDrop(x, y);
+            else if (gamePhase === "sedimentBurst") handleSedimentDrop(x, y);
         }
-
         function handleRemoteSkill(skill, payload) {
-            if (skill === "blast") {
-                handleBlastPlacement(payload.x, payload.y);
-            } else if (skill === "sediment") {
-                playerData[currentPlayer].sedimentLayers++;
-                endTurn();
-            }
+            if (skill === "blast") handleBlastPlacement(payload.x, payload.y);
+            else if (skill === "sediment") { playerData[currentPlayer].sedimentLayers++; endTurn(); }
         }
 
-        // 初始化棋盘
+        // 棋盘初始化
         function initBoard() {
             board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(EMPTY));
             const boardEl = document.getElementById("board");
@@ -667,16 +449,12 @@
             blastMarkers = [];
             gameOver = false;
             currentPlayer = BLACK;
-            extraPieceThisTurn = false;
-            extraPieceUsed = false;
-            
+            extraPieceThisTurn = extraPieceUsed = false;
             playerData[BLACK] = { skill: null, skillCount: 0, sedimentLayers: 0, remainingDrops: 0 };
             playerData[WHITE] = { skill: null, skillCount: 0, sedimentLayers: 0, remainingDrops: 0 };
-            
             document.querySelectorAll(".skill-btn").forEach(btn => btn.style.display = "none");
             document.getElementById("black-sediment-text").style.display = "none";
             document.getElementById("white-sediment-text").style.display = "none";
-            
             renderBoard();
             updateUI();
         }
@@ -684,21 +462,14 @@
         function startSkillSelect() {
             gamePhase = "skillSelect";
             document.getElementById("skill-select-modal").style.display = "flex";
-            
-            if (gameMode === "ai") {
-                document.getElementById("select-prompt").textContent = "请选择你的技能";
-            } else if (gameMode === "online" && !isOnlineHost) {
-                document.getElementById("select-prompt").textContent = "请选择你的技能";
-            } else {
-                document.getElementById("select-prompt").textContent = "黑方请选择你的技能";
-            }
+            document.getElementById("select-prompt").textContent = 
+                gameMode === "ai" || (gameMode === "online" && !isOnlineHost) ? "请选择你的技能" : "黑方请选择你的技能";
         }
 
         // 技能选择
         document.querySelectorAll(".skill-option").forEach(option => {
             option.addEventListener("click", () => {
                 const skillId = option.dataset.skill;
-                
                 if (gameMode === "ai") {
                     playerData[BLACK].skill = skillId;
                     setSkillInitialCount(BLACK, skillId);
@@ -706,7 +477,6 @@
                     const aiSkill = aiSkills[Math.floor(Math.random() * aiSkills.length)];
                     playerData[WHITE].skill = aiSkill;
                     setSkillInitialCount(WHITE, aiSkill);
-                    
                     document.getElementById("skill-select-modal").style.display = "none";
                     gamePhase = "normal";
                     finishSkillSelectSetup();
@@ -715,7 +485,6 @@
                     playerData[myPlayer].skill = skillId;
                     setSkillInitialCount(myPlayer, skillId);
                     connection.send({ type: "skillSelect", skill: skillId });
-                    
                     if (isOnlineHost) {
                         document.getElementById("select-prompt").textContent = "等待对方选择技能...";
                     } else {
@@ -741,77 +510,42 @@
         });
 
         function finishSkillSelectSetup() {
-            if (playerData[BLACK].skill === "sediment") {
-                document.getElementById("black-sediment-text").style.display = "block";
-            }
-            if (playerData[WHITE].skill === "sediment") {
-                document.getElementById("white-sediment-text").style.display = "block";
-            }
-            
+            if (playerData[BLACK].skill === "sediment") document.getElementById("black-sediment-text").style.display = "block";
+            if (playerData[WHITE].skill === "sediment") document.getElementById("white-sediment-text").style.display = "block";
             updateStatus("游戏开始！当前回合：黑方");
             refreshSkillButton();
             updateUI();
-
-            if (gameMode === "ai" && currentPlayer === WHITE) {
-                setTimeout(aiMove, 800);
-            }
+            if (gameMode === "ai" && currentPlayer === WHITE) setTimeout(aiMove, 800);
         }
 
         function setSkillInitialCount(player, skillId) {
             switch(skillId) {
-                case "blast":
-                    playerData[player].skillCount = player === BLACK ? 3 : 4;
-                    break;
-                case "copy":
-                    playerData[player].skillCount = 2;
-                    break;
-                case "sediment":
-                    playerData[player].skillCount = Infinity;
-                    break;
-                case "gambler":
-                    playerData[player].skillCount = 2;
-                    break;
+                case "blast": playerData[player].skillCount = player === BLACK ? 3 : 4; break;
+                case "copy": playerData[player].skillCount = 2; break;
+                case "sediment": playerData[player].skillCount = Infinity; break;
+                case "gambler": playerData[player].skillCount = 2; break;
             }
         }
 
-        // 只显示当前可操作玩家的技能按钮
         function refreshSkillButton() {
             document.querySelectorAll(".skill-btn").forEach(btn => btn.style.display = "none");
-            
-            if (gameMode === "online") {
-                const myPlayer = isOnlineHost ? BLACK : WHITE;
-                if (currentPlayer === myPlayer) {
-                    const skill = playerData[myPlayer].skill;
-                    if (skill && SKILL_BTN_MAP[skill]) {
-                        document.getElementById(SKILL_BTN_MAP[skill]).style.display = "block";
-                    }
-                }
-            } else if (gameMode === "ai") {
-                if (currentPlayer === BLACK) {
-                    const skill = playerData[BLACK].skill;
-                    if (skill && SKILL_BTN_MAP[skill]) {
-                        document.getElementById(SKILL_BTN_MAP[skill]).style.display = "block";
-                    }
-                }
-            } else {
-                const skill = playerData[currentPlayer].skill;
-                if (skill && SKILL_BTN_MAP[skill]) {
-                    document.getElementById(SKILL_BTN_MAP[skill]).style.display = "block";
-                }
-            }
-        }
-
-        // 格子点击总入口
-        function handleCellClick(x, y) {
-            if (gameOver) return;
-            if (gamePhase === "skillSelect" || gamePhase === "modeSelect") return;
-            
+            let showPlayer = currentPlayer;
             if (gameMode === "online") {
                 const myPlayer = isOnlineHost ? BLACK : WHITE;
                 if (currentPlayer !== myPlayer) return;
+                showPlayer = myPlayer;
+            } else if (gameMode === "ai" && currentPlayer === WHITE) return;
+            const skill = playerData[showPlayer].skill;
+            if (skill && SKILL_BTN_MAP[skill]) {
+                document.getElementById(SKILL_BTN_MAP[skill]).style.display = "block";
             }
-            if (gameMode === "ai" && currentPlayer === WHITE) return;
+        }
 
+        // 落子入口
+        function handleCellClick(x, y) {
+            if (gameOver || gamePhase === "skillSelect" || gamePhase === "modeSelect") return;
+            if (gameMode === "online" && currentPlayer !== (isOnlineHost ? BLACK : WHITE)) return;
+            if (gameMode === "ai" && currentPlayer === WHITE) return;
             switch (gamePhase) {
                 case "normal": handleNormalDrop(x, y); break;
                 case "placingBlast": handleBlastPlacement(x, y); break;
@@ -821,17 +555,11 @@
             }
         }
 
-        // 普通落子
         function handleNormalDrop(x, y) {
             if (board[y][x] !== EMPTY) return;
             placePiece(x, y, currentPlayer);
-            
             if (isMyTurn() && gameMode !== "local") sendMove(x, y);
-
-            if (checkWin(x, y, currentPlayer)) {
-                endGame(currentPlayer);
-                return;
-            }
+            if (checkWin(x, y, currentPlayer)) return endGame(currentPlayer);
 
             if (extraPieceThisTurn && !extraPieceUsed) {
                 extraPieceUsed = true;
@@ -846,27 +574,18 @@
                 updateUI();
                 return;
             }
-
             endTurn();
         }
 
         function isMyTurn() {
-            if (gameMode === "online") {
-                return currentPlayer === (isOnlineHost ? BLACK : WHITE);
-            }
-            return true;
+            return gameMode !== "online" || currentPlayer === (isOnlineHost ? BLACK : WHITE);
         }
 
-        // 沉淀爆发落子
         function handleSedimentDrop(x, y) {
             if (board[y][x] !== EMPTY) return;
             placePiece(x, y, currentPlayer);
             if (isMyTurn() && gameMode !== "local") sendMove(x, y);
-
-            if (checkWin(x, y, currentPlayer)) {
-                endGame(currentPlayer);
-                return;
-            }
+            if (checkWin(x, y, currentPlayer)) return endGame(currentPlayer);
 
             playerData[currentPlayer].remainingDrops--;
             if (playerData[currentPlayer].remainingDrops > 0) {
@@ -879,61 +598,39 @@
             updateUI();
         }
 
-        // 放置爆破标记
         function handleBlastPlacement(x, y) {
-            if (board[y][x] !== EMPTY) {
-                updateStatus("只能在空位放置爆破标记");
-                return;
-            }
-            if (blastMarkers.some(m => m.x === x && m.y === y)) {
-                updateStatus("该位置已有爆破标记");
-                return;
-            }
-
+            if (board[y][x] !== EMPTY) return updateStatus("只能在空位放置爆破标记");
+            if (blastMarkers.some(m => m.x === x && m.y === y)) return updateStatus("该位置已有爆破标记");
+            
             blastMarkers.push({ x, y, owner: currentPlayer, remainingMoves: 2 });
             playerData[currentPlayer].skillCount--;
             gamePhase = "normal";
-            
             if (isMyTurn() && gameMode !== "local") sendSkill("blast", {x, y});
-            
             updateStatus("爆破标记已放置，2回合后爆炸");
             renderBoard();
             updateUI();
             endTurn();
         }
 
-        // 选择复制源棋组
         function handleCopySourceSelect(x, y) {
-            if (board[y][x] !== currentPlayer) {
-                updateStatus("请选择己方棋子");
-                return;
-            }
-
+            if (board[y][x] !== currentPlayer) return updateStatus("请选择己方棋子");
             const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
-            let maxLine = [{x, y}];
-            let maxDir = [1, 0];
+            let maxLine = [{x, y}], maxDir = [1, 0];
             const maxLength = 3;
 
             for (const [dx, dy] of directions) {
                 const line = [{x, y}];
                 let nx = x + dx, ny = y + dy;
-                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE 
-                       && board[ny][nx] === currentPlayer 
-                       && line.length < maxLength) {
+                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board[ny][nx] === currentPlayer && line.length < maxLength) {
                     line.push({x: nx, y: ny});
                     nx += dx; ny += dy;
                 }
                 nx = x - dx; ny = y - dy;
-                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE 
-                       && board[ny][nx] === currentPlayer 
-                       && line.length < maxLength) {
+                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board[ny][nx] === currentPlayer && line.length < maxLength) {
                     line.unshift({x: nx, y: ny});
                     nx -= dx; ny -= dy;
                 }
-                if (line.length > maxLine.length) {
-                    maxLine = line;
-                    maxDir = [dx, dy];
-                }
+                if (line.length > maxLine.length) { maxLine = line; maxDir = [dx, dy]; }
             }
 
             selectedCopySource = maxLine;
@@ -943,7 +640,6 @@
             updateStatus(`已选中${maxLine.length}颗棋子，请点击目标空位放置`);
         }
 
-        // 选择复制目标位置
         function handleCopyTargetSelect(x, y) {
             const targets = [];
             const [dx, dy] = copyDirection;
@@ -952,37 +648,22 @@
             }
 
             for (const t of targets) {
-                if (t.x < 0 || t.x >= BOARD_SIZE || t.y < 0 || t.y >= BOARD_SIZE) {
-                    updateStatus("目标位置超出棋盘");
-                    return;
-                }
-                if (board[t.y][t.x] !== EMPTY || blastMarkers.some(m => m.x === t.x && m.y === t.y)) {
-                    updateStatus("目标位置必须全部为空");
-                    return;
-                }
+                if (t.x < 0 || t.x >= BOARD_SIZE || t.y < 0 || t.y >= BOARD_SIZE) return updateStatus("目标位置超出棋盘");
+                if (board[t.y][t.x] !== EMPTY || blastMarkers.some(m => m.x === t.x && m.y === t.y)) return updateStatus("目标位置必须全部为空");
             }
 
             let hasGap = true;
             for (const src of selectedCopySource) {
                 for (const t of targets) {
-                    if (Math.abs(src.x - t.x) <= 1 && Math.abs(src.y - t.y) <= 1) {
-                        hasGap = false;
-                        break;
-                    }
+                    if (Math.abs(src.x - t.x) <= 1 && Math.abs(src.y - t.y) <= 1) { hasGap = false; break; }
                 }
                 if (!hasGap) break;
             }
-            if (!hasGap) {
-                updateStatus("复制棋组必须与原棋组至少间隔1个空位");
-                return;
-            }
+            if (!hasGap) return updateStatus("复制棋组必须与原棋组至少间隔1个空位");
 
             for (const t of targets) {
                 board[t.y][t.x] = currentPlayer;
-                if (checkWin(t.x, t.y, currentPlayer)) {
-                    endGame(currentPlayer);
-                    return;
-                }
+                if (checkWin(t.x, t.y, currentPlayer)) return endGame(currentPlayer);
             }
 
             playerData[currentPlayer].skillCount--;
@@ -1000,14 +681,11 @@
             blastMarkers.forEach(marker => {
                 if (marker.owner !== currentPlayer) marker.remainingMoves--;
             });
-
-            const exploded = blastMarkers.filter(m => m.remainingMoves <= 0);
-            exploded.forEach(m => triggerBlast(m.x, m.y));
+            blastMarkers.filter(m => m.remainingMoves <= 0).forEach(m => triggerBlast(m.x, m.y));
             blastMarkers = blastMarkers.filter(m => m.remainingMoves > 0);
 
             currentPlayer = currentPlayer === BLACK ? WHITE : BLACK;
-            extraPieceThisTurn = false;
-            extraPieceUsed = false;
+            extraPieceThisTurn = extraPieceUsed = false;
             gamePhase = "normal";
 
             refreshSkillButton();
@@ -1015,16 +693,13 @@
             updateUI();
             updateStatus(`当前回合：${currentPlayer === BLACK ? "黑方" : "白方"}`);
 
-            if (gameMode === "ai" && currentPlayer === WHITE && !gameOver) {
-                setTimeout(aiMove, 800);
-            }
+            if (gameMode === "ai" && currentPlayer === WHITE && !gameOver) setTimeout(aiMove, 800);
         }
 
         function triggerBlast(centerX, centerY) {
             for (let dy = -1; dy <= 1; dy++) {
                 for (let dx = -1; dx <= 1; dx++) {
-                    const x = centerX + dx;
-                    const y = centerY + dy;
+                    const x = centerX + dx, y = centerY + dy;
                     if (x >= 0 && x < BOARD_SIZE && y >= 0 && y < BOARD_SIZE) {
                         board[y][x] = EMPTY;
                         blastMarkers = blastMarkers.filter(m => !(m.x === x && m.y === y));
@@ -1033,24 +708,16 @@
             }
         }
 
-        function placePiece(x, y, player) {
-            board[y][x] = player;
-            renderBoard();
-        }
+        function placePiece(x, y, player) { board[y][x] = player; renderBoard(); }
 
-        // 胜负判定
         function checkWin(x, y, player) {
             const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
             for (const [dx, dy] of directions) {
                 let count = 1;
                 let nx = x + dx, ny = y + dy;
-                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board[ny][nx] === player) {
-                    count++; nx += dx; ny += dy;
-                }
+                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board[ny][nx] === player) { count++; nx += dx; ny += dy; }
                 nx = x - dx; ny = y - dy;
-                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board[ny][nx] === player) {
-                    count++; nx -= dx; ny -= dy;
-                }
+                while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE && board[ny][nx] === player) { count++; nx -= dx; ny -= dy; }
                 if (count >= 5) return true;
             }
             return false;
@@ -1059,15 +726,11 @@
         // AI逻辑
         function aiMove() {
             if (gameOver || gamePhase !== "normal") return;
-            
             const aiSkill = playerData[WHITE].skill;
-            
+
             if (aiSkill === "blast" && playerData[WHITE].skillCount > 0) {
                 const blastPos = findBestBlastPosition();
-                if (blastPos) {
-                    handleBlastPlacement(blastPos.x, blastPos.y);
-                    return;
-                }
+                if (blastPos) return handleBlastPlacement(blastPos.x, blastPos.y);
             }
 
             if (aiSkill === "sediment" && playerData[WHITE].sedimentLayers < 2 && countTotalPieces() > 10) {
@@ -1075,29 +738,19 @@
                     playerData[WHITE].sedimentLayers++;
                     updateStatus("AI选择沉淀蓄力");
                     updateUI();
-                    endTurn();
-                    return;
+                    return endTurn();
                 }
             }
 
-            let bestScore = -Infinity;
-            let bestMoves = [];
-
+            let bestScore = -Infinity, bestMoves = [];
             for (let y = 0; y < BOARD_SIZE; y++) {
                 for (let x = 0; x < BOARD_SIZE; x++) {
                     if (board[y][x] !== EMPTY) continue;
-                    const attackScore = evaluatePosition(x, y, WHITE);
-                    const defendScore = evaluatePosition(x, y, BLACK) * 0.95;
-                    const score = attackScore + defendScore;
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestMoves = [{x, y}];
-                    } else if (score === bestScore) {
-                        bestMoves.push({x, y});
-                    }
+                    const score = evaluatePosition(x, y, WHITE) + evaluatePosition(x, y, BLACK) * 0.95;
+                    if (score > bestScore) { bestScore = score; bestMoves = [{x, y}]; }
+                    else if (score === bestScore) bestMoves.push({x, y});
                 }
             }
-
             if (bestMoves.length > 0) {
                 const move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
                 handleNormalDrop(move.x, move.y);
@@ -1107,11 +760,8 @@
         function evaluatePosition(x, y, player) {
             const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
             let totalScore = 0;
-
             for (const [dx, dy] of directions) {
-                let count = 1;
-                let blocked = 0;
-
+                let count = 1, blocked = 0;
                 let nx = x + dx, ny = y + dy;
                 while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
                     if (board[ny][nx] === player) count++;
@@ -1120,7 +770,6 @@
                     nx += dx; ny += dy;
                 }
                 if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) blocked++;
-
                 nx = x - dx; ny = y - dy;
                 while (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
                     if (board[ny][nx] === player) count++;
@@ -1138,26 +787,19 @@
                 else if (count === 2 && blocked === 0) totalScore += 100;
                 else if (count === 2 && blocked === 1) totalScore += 10;
             }
-
-            const centerDist = Math.abs(x - 7) + Math.abs(y - 7);
-            totalScore += (14 - centerDist) * 2;
-
+            totalScore += (14 - Math.abs(x - 7) - Math.abs(y - 7)) * 2;
             return totalScore;
         }
 
         function findBestBlastPosition() {
-            let maxThreat = 0;
-            let bestPos = null;
-
+            let maxThreat = 0, bestPos = null;
             for (let y = 1; y < BOARD_SIZE - 1; y++) {
                 for (let x = 1; x < BOARD_SIZE - 1; x++) {
                     if (board[y][x] !== EMPTY) continue;
                     let blackCount = 0;
-                    for (let dy = -1; dy <= 1; dy++) {
-                        for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++)
+                        for (let dx = -1; dx <= 1; dx++)
                             if (board[y+dy][x+dx] === BLACK) blackCount++;
-                        }
-                    }
                     if (blackCount >= 3 && blackCount > maxThreat) {
                         maxThreat = blackCount;
                         bestPos = {x, y};
@@ -1167,42 +809,28 @@
             return bestPos;
         }
 
-        // 渲染棋盘
+        // 渲染
         function renderBoard() {
             const cells = document.querySelectorAll(".cell");
             cells.forEach(cell => {
-                const x = parseInt(cell.dataset.x);
-                const y = parseInt(cell.dataset.y);
+                const x = parseInt(cell.dataset.x), y = parseInt(cell.dataset.y);
                 cell.className = "cell";
                 cell.textContent = "";
-
                 if (board[y][x] === BLACK) cell.classList.add("black-piece");
                 else if (board[y][x] === WHITE) cell.classList.add("white-piece");
-
                 const marker = blastMarkers.find(m => m.x === x && m.y === y);
-                if (marker) {
-                    cell.classList.add("blast-marker");
-                    cell.textContent = marker.remainingMoves;
-                }
-
-                if (selectedCopySource.some(pos => pos.x === x && pos.y === y)) {
-                    cell.classList.add("selected");
-                }
+                if (marker) { cell.classList.add("blast-marker"); cell.textContent = marker.remainingMoves; }
+                if (selectedCopySource.some(pos => pos.x === x && pos.y === y)) cell.classList.add("selected");
             });
         }
 
-        // 更新UI面板
         function updateUI() {
-            document.getElementById("black-skill-name").textContent = 
-                playerData[BLACK].skill ? SKILL_NAMES[playerData[BLACK].skill] : "未选择";
-            document.getElementById("black-skill-count").textContent = 
-                playerData[BLACK].skill === "sediment" ? "无限制" : playerData[BLACK].skillCount;
+            document.getElementById("black-skill-name").textContent = playerData[BLACK].skill ? SKILL_NAMES[playerData[BLACK].skill] : "未选择";
+            document.getElementById("black-skill-count").textContent = playerData[BLACK].skill === "sediment" ? "无限制" : playerData[BLACK].skillCount;
             document.getElementById("black-sediment").textContent = playerData[BLACK].sedimentLayers;
 
-            document.getElementById("white-skill-name").textContent = 
-                playerData[WHITE].skill ? SKILL_NAMES[playerData[WHITE].skill] : "未选择";
-            document.getElementById("white-skill-count").textContent = 
-                playerData[WHITE].skill === "sediment" ? "无限制" : playerData[WHITE].skillCount;
+            document.getElementById("white-skill-name").textContent = playerData[WHITE].skill ? SKILL_NAMES[playerData[WHITE].skill] : "未选择";
+            document.getElementById("white-skill-count").textContent = playerData[WHITE].skill === "sediment" ? "无限制" : playerData[WHITE].skillCount;
             document.getElementById("white-sediment").textContent = playerData[WHITE].sedimentLayers;
 
             document.getElementById("stat-black").classList.toggle("active", currentPlayer === BLACK);
@@ -1211,11 +839,9 @@
             const currentSkill = playerData[currentPlayer].skill;
             if (currentSkill && SKILL_BTN_MAP[currentSkill]) {
                 const btn = document.getElementById(SKILL_BTN_MAP[currentSkill]);
-                if (currentSkill === "sediment") {
-                    btn.disabled = playerData[currentPlayer].sedimentLayers >= 3 || gamePhase !== "normal";
-                } else {
-                    btn.disabled = playerData[currentPlayer].skillCount <= 0 || gamePhase !== "normal";
-                }
+                btn.disabled = currentSkill === "sediment" 
+                    ? playerData[currentPlayer].sedimentLayers >= 3 || gamePhase !== "normal"
+                    : playerData[currentPlayer].skillCount <= 0 || gamePhase !== "normal";
             }
         }
 
@@ -1237,54 +863,33 @@
             return count;
         }
 
-        function isBoardEmpty() {
-            return countTotalPieces() === 0;
-        }
+        function isBoardEmpty() { return countTotalPieces() === 0; }
 
         // 技能按钮事件
         document.getElementById("skill-blast").addEventListener("click", () => {
-            if (playerData[currentPlayer].skill !== "blast") return;
-            if (gameOver || gamePhase !== "normal") return;
+            if (playerData[currentPlayer].skill !== "blast" || gameOver || gamePhase !== "normal") return;
             if (playerData[currentPlayer].skillCount <= 0) return;
-            if (currentPlayer === BLACK && isBoardEmpty()) {
-                updateStatus("黑方首回合禁止使用爆破专家");
-                return;
-            }
+            if (currentPlayer === BLACK && isBoardEmpty()) return updateStatus("黑方首回合禁止使用爆破专家");
             gamePhase = "placingBlast";
             updateStatus("请点击空位放置爆破标记");
         });
 
         document.getElementById("skill-copy").addEventListener("click", () => {
-            if (playerData[currentPlayer].skill !== "copy") return;
-            if (gameOver || gamePhase !== "normal") return;
+            if (playerData[currentPlayer].skill !== "copy" || gameOver || gamePhase !== "normal") return;
             if (playerData[currentPlayer].skillCount <= 0) return;
             const total = countTotalPieces();
-            if ((currentPlayer === BLACK && total <= 4) || (currentPlayer === WHITE && total <= 3)) {
-                updateStatus("开局阶段禁止使用复制技能");
-                return;
-            }
+            if ((currentPlayer === BLACK && total <= 4) || (currentPlayer === WHITE && total <= 3)) return updateStatus("开局阶段禁止使用复制技能");
             gamePhase = "selectingCopySource";
             selectedCopySource = [];
             updateStatus("请点击己方棋子选择要复制的棋组");
         });
 
         document.getElementById("skill-sediment").addEventListener("click", () => {
-            if (playerData[currentPlayer].skill !== "sediment") return;
-            if (gameOver || gamePhase !== "normal") return;
-            if (playerData[currentPlayer].sedimentLayers >= 3) {
-                updateStatus("沉淀层数已达上限，必须落子");
-                return;
-            }
-            if (currentPlayer === BLACK && isBoardEmpty()) {
-                updateStatus("黑方首回合禁止使用沉淀");
-                return;
-            }
+            if (playerData[currentPlayer].skill !== "sediment" || gameOver || gamePhase !== "normal") return;
+            if (playerData[currentPlayer].sedimentLayers >= 3) return updateStatus("沉淀层数已达上限，必须落子");
+            if (currentPlayer === BLACK && isBoardEmpty()) return updateStatus("黑方首回合禁止使用沉淀");
             playerData[currentPlayer].sedimentLayers++;
-            
-            if (gameMode === "online" && isMyTurn()) {
-                sendSkill("sediment", {});
-            }
-            
+            if (gameMode === "online" && isMyTurn()) sendSkill("sediment", {});
             updateStatus(`放弃本回合，沉淀层数增加至 ${playerData[currentPlayer].sedimentLayers} 层`);
             updateUI();
             endTurn();
@@ -1292,24 +897,13 @@
 
         // 赌徒技能
         document.getElementById("skill-gambler").addEventListener("click", () => {
-            if (playerData[currentPlayer].skill !== "gambler") return;
-            if (gameOver || gamePhase !== "normal") return;
+            if (playerData[currentPlayer].skill !== "gambler" || gameOver || gamePhase !== "normal") return;
             if (playerData[currentPlayer].skillCount <= 0) return;
             const total = countTotalPieces();
-            if ((currentPlayer === BLACK && total < 2) || (currentPlayer === WHITE && total < 1)) {
-                updateStatus("开局阶段禁止使用赌徒技能");
-                return;
-            }
-            gamblerState = {
-                active: true,
-                initiator: currentPlayer,
-                initiatorChoice: null,
-                opponentChoice: null,
-                drawCount: 0
-            };
+            if ((currentPlayer === BLACK && total < 2) || (currentPlayer === WHITE && total < 1)) return updateStatus("开局阶段禁止使用赌徒技能");
+            gamblerState = { active: true, initiator: currentPlayer, initiatorChoice: null, opponentChoice: null, drawCount: 0 };
             document.getElementById("gambler-modal").style.display = "flex";
-            document.getElementById("gambler-prompt").textContent = 
-                `${currentPlayer === BLACK ? "黑方" : "白方"}请选择出拳`;
+            document.getElementById("gambler-prompt").textContent = `${currentPlayer === BLACK ? "黑方" : "白方"}请选择出拳`;
         });
 
         document.querySelectorAll(".rps-btn").forEach(btn => {
@@ -1328,7 +922,6 @@
 
         function resolveGambler() {
             const { initiatorChoice, opponentChoice, initiator } = gamblerState;
-
             if (initiatorChoice === opponentChoice) {
                 gamblerState.drawCount++;
                 if (gamblerState.drawCount >= 3) {
@@ -1338,10 +931,8 @@
                     return;
                 }
                 alert("平局！重新出拳");
-                gamblerState.initiatorChoice = null;
-                gamblerState.opponentChoice = null;
-                document.getElementById("gambler-prompt").textContent = 
-                    `平局！${initiator === BLACK ? "黑方" : "白方"}请重新选择`;
+                gamblerState.initiatorChoice = gamblerState.opponentChoice = null;
+                document.getElementById("gambler-prompt").textContent = `平局！${initiator === BLACK ? "黑方" : "白方"}请重新选择`;
                 return;
             }
 
@@ -1370,9 +961,7 @@
         document.getElementById("buff-restore-skill").addEventListener("click", () => {
             const player = window.currentBuffPlayer;
             const skill = playerData[player].skill;
-            const maxCount
             const maxCount = skill === "blast" ? (player === BLACK ? 3 : 4) : 2;
-            
             if (playerData[player].skillCount < maxCount) {
                 playerData[player].skillCount++;
                 updateStatus(`赌徒胜利！恢复1次${SKILL_NAMES[skill]}次数`);
@@ -1385,8 +974,7 @@
         });
 
         function applyDebuff(player) {
-            const rand = Math.random();
-            if (rand < 0.5) {
+            if (Math.random() < 0.5) {
                 updateStatus("赌徒失败！本回合无法落子");
                 setTimeout(() => endTurn(), 1200);
             } else {
@@ -1401,7 +989,7 @@
             updateUI();
         }
 
-        // 取消技能
+        // 取消技能 & 返回菜单
         document.getElementById("cancel-skill").addEventListener("click", () => {
             if (gamePhase === "normal" || gamePhase === "skillSelect" || gamePhase === "modeSelect") return;
             gamePhase = "normal";
@@ -1410,13 +998,8 @@
             updateStatus(`已取消技能，当前回合：${currentPlayer === BLACK ? "黑方" : "白方"}`);
         });
 
-        // 返回主菜单
         document.getElementById("restart").addEventListener("click", () => {
-            if (peer) {
-                peer.destroy();
-                peer = null;
-                connection = null;
-            }
+            if (peer) { peer.destroy(); peer = null; connection = null; }
             document.getElementById("mode-modal").style.display = "flex";
             document.getElementById("room-create-area").style.display = "none";
             document.getElementById("room-join-area").style.display = "none";
