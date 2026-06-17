@@ -1,1126 +1,1096 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>技能五子棋</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: "Microsoft YaHei", sans-serif;
-            background: #f0f2f5;
-            display: flex; justify-content: center;
-            padding: 20px; min-height: 100vh;
-        }
-        .container { max-width: 950px; width: 100%; }
-        .watermark {
-            position: fixed; right: 24px; bottom: 20px;
-            font-size: 28px; font-weight: bold;
-            color: rgba(0,0,0,0.15);
-            pointer-events: none; z-index: 999;
-        }
-        h1 { text-align: center; color: #333; margin-bottom: 10px; }
-        .online-count, .identity-tip { text-align: center; font-size: 14px; margin-bottom: 6px; }
-        .online-count { color: #666; }
-        .identity-tip { font-weight: bold; display: none; }
-        .identity-tip.black { color: #1a1a1a; }
-        .identity-tip.white { color: #7f8c8d; }
-
-        .game-info {
-            background: #fff; padding: 15px; border-radius: 8px;
-            margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        #status {
-            text-align: center; font-size: 20px; font-weight: bold;
-            margin-bottom: 15px; padding: 8px; border-radius: 6px;
-            transition: all 0.3s;
-        }
-        .status-black { background: #1a1a1a; color: #fff; }
-        .status-white { background: #ecf0f1; color: #2c3e50; border: 1px solid #bdc3c7; }
-        .glow { box-shadow: 0 0 15px #f39c12; }
-
-        .player-stats { display: flex; justify-content: space-around; gap: 10px; }
-        .stat {
-            flex: 1; padding: 10px 15px; border-radius: 6px;
-            transition: all 0.3s; position: relative; background: #fafafa;
-        }
-        .stat.active { box-shadow: 0 0 0 2px #3498db; background: #f0f8ff; }
-        .stat.me::after {
-            content: "你"; position: absolute; top: -8px; right: -8px;
-            background: #e74c3c; color: #fff; font-size: 12px;
-            padding: 2px 6px; border-radius: 10px;
-        }
-        .stat h3 { margin-bottom: 6px; font-size: 16px; }
-        .stat.black h3 { color: #000; }
-        .stat.white h3 { color: #666; }
-        .stat p { font-size: 13px; color: #555; margin: 2px 0; }
-        .skill-desc {
-            font-size: 11px; color: #888; line-height: 1.4;
-            margin-top: 6px; padding-top: 6px; border-top: 1px dashed #eee;
-        }
-
-        .main { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
-        .board {
-            display: grid;
-            grid-template-columns: repeat(15, 40px);
-            grid-template-rows: repeat(15, 40px);
-            background-color: #deb887;
-            background-image: 
-                linear-gradient(to right, #8b7355 1px, transparent 1px),
-                linear-gradient(to bottom, #8b7355 1px, transparent 1px);
-            background-size: 40px 40px;
-            background-position: 20px 20px;
-            border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-        .cell {
-            width: 40px; height: 40px; position: relative;
-            cursor: pointer; display: flex;
-            align-items: center; justify-content: center;
-            font-size: 12px; color: #d32f2f; font-weight: bold; z-index: 1;
-        }
-        .cell:hover { background: rgba(255,255,255,0.2); border-radius: 50%; }
-        .cell::before {
-            content: ""; position: absolute; width: 32px; height: 32px;
-            border-radius: 50%; z-index: 2; transform: scale(0);
-            transition: transform 0.15s ease-out;
-        }
-        .cell.black::before {
-            background: radial-gradient(circle at 30% 30%, #555, #000);
-            box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            transform: scale(1);
-        }
-        .cell.white::before {
-            background: radial-gradient(circle at 30% 30%, #fff, #ddd);
-            border: 1px solid #bbb;
-            box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-            transform: scale(1);
-        }
-        /* 特效类 */
-        .cell.copy::before { animation: copyIn 0.4s ease; }
-        .cell.blast::after, .cell.thunder::after {
-            content: ""; position: absolute; inset: 0;
-            border-radius: 50%; animation: flash 0.5s ease forwards; z-index: 4;
-        }
-        .cell.blast::after { background: rgba(255, 80, 80, 0.7); }
-        .cell.thunder::after { background: radial-gradient(circle, #fff700 0%, #ffaa00 60%, transparent 100%); }
-        .cell.bomb { background: rgba(255,0,0,0.35); border-radius: 4px; }
-        .cell.sel { background: rgba(0,200,0,0.4); border-radius: 4px; }
-
-        .skills {
-            display: flex; flex-direction: column; gap: 10px;
-            background: #fff; padding: 15px; border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-width: 160px;
-        }
-        .skills h3 { text-align: center; margin-bottom: 10px; font-size: 16px; }
-        .btn {
-            padding: 10px; border: none; border-radius: 6px;
-            cursor: pointer; font-size: 14px; transition: background 0.2s;
-            display: none; color: #fff;
-        }
-        .btn.skill { background: #3498db; }
-        .btn.skill:hover:not(:disabled) { background: #2980b9; }
-        .btn.skill:disabled { background: #bdc3c7; cursor: not-allowed; }
-        .btn.cancel { background: #e74c3c; margin-top: 10px; display: block; }
-        .btn.cancel:hover { background: #c0392b; }
-        .btn.back { background: #27ae60; margin-top: auto; display: block; }
-        .btn.back:hover { background: #229954; }
-
-        .modal {
-            display: none; position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center; align-items: center; z-index: 1000;
-        }
-        .modal.show { display: flex; animation: modalIn 0.3s ease; }
-        .modal-box {
-            background: #fff; padding: 30px; border-radius: 8px;
-            text-align: center; min-width: 300px;
-        }
-        .modal-box h3 { margin-bottom: 20px; }
-
-        .mode-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
-        .btn.mode { display: block; width: 100%; background: #3498db; padding: 14px; font-size: 16px; }
-        .btn.mode:hover { background: #2980b9; }
-        .btn.mode.random { background: #9b59b6; }
-        .btn.mode.random:hover { background: #8e44ad; }
-        .input {
-            width: 100%; padding: 10px; margin: 10px 0;
-            border: 1px solid #ddd; border-radius: 6px; font-size: 14px;
-        }
-        .room-id {
-            font-size: 18px; font-weight: bold; color: #e67e22;
-            margin: 10px 0; letter-spacing: 2px; user-select: all;
-        }
-        .tip { margin-top: 15px; color: #666; font-size: 14px; display: none; }
-        .tip.show { display: block; }
-
-        .skill-list {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 15px; margin-top: 20px;
-        }
-        .skill-card {
-            border: 2px solid #ddd; border-radius: 8px;
-            padding: 15px; cursor: pointer; transition: all 0.2s; text-align: left;
-        }
-        .skill-card:hover { border-color: #3498db; background: #f0f8ff; }
-        .skill-card h4 { margin-bottom: 8px; color: #2c3e50; font-size: 15px; }
-        .skill-card p { font-size: 12px; color: #666; margin: 3px 0; }
-        .skill-card .num { color: #e67e22; font-weight: bold; margin-top: 6px; }
-
-        .rps-list { display: flex; gap: 15px; justify-content: center; margin-top: 20px; }
-        .rps-btn {
-            padding: 15px 20px; font-size: 24px;
-            border: 2px solid #ddd; border-radius: 8px;
-            background: #fff; cursor: pointer; transition: all 0.2s;
-        }
-        .rps-btn:hover { border-color: #3498db; background: #f0f8ff; }
-
-        /* 动画 */
-        @keyframes flash {
-            0% { transform: scale(0.5); opacity: 0; }
-            30% { transform: scale(1.3); opacity: 1; }
-            100% { transform: scale(1.8); opacity: 0; }
-        }
-        @keyframes copyIn {
-            0% { transform: scale(0); opacity: 0; }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes modalIn {
-            0% { transform: scale(0.8); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>技能五子棋</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei",sans-serif;background:#f0f2f5;display:flex;justify-content:center;padding:20px;min-height:100vh}
+.container{max-width:950px;width:100%}
+.watermark{position:fixed;right:24px;bottom:20px;font-size:28px;font-weight:bold;color:rgba(0,0,0,.15);pointer-events:none;z-index:999}
+h1{text-align:center;color:#333;margin-bottom:10px;animation:ti .9s cubic-bezier(.36,1.2,.5,1) forwards;opacity:0}
+@keyframes ti{0%{transform:translateY(-60px) scale(.7);opacity:0;letter-spacing:8px}60%{transform:translateY(8px) scale(1.1);opacity:1;letter-spacing:2px}100%{transform:translateY(0) scale(1);opacity:1;letter-spacing:0}}
+.online-count,.identity-tip{text-align:center;font-size:14px;margin-bottom:6px}
+.online-count{color:#666;animation:fi .6s ease .4s forwards;opacity:0}
+.identity-tip{font-weight:bold;display:none}
+.identity-tip.black{color:#1a1a1a}.identity-tip.white{color:#7f8c8d}
+@keyframes fi{to{opacity:1}}
+.game-info{background:#fff;padding:15px;border-radius:8px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.1);animation:fu .6s ease .2s forwards;opacity:0}
+@keyframes fu{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+#status{text-align:center;font-size:20px;font-weight:bold;margin-bottom:15px;padding:8px;border-radius:6px;transition:all .3s}
+.status-black{background:#1a1a1a;color:#fff}.status-white{background:#ecf0f1;color:#2c3e50;border:1px solid #bdc3c7}
+.glow{box-shadow:0 0 15px #f39c12}
+.player-stats{display:flex;justify-content:space-around;gap:10px}
+.stat{flex:1;padding:10px 15px;border-radius:6px;transition:all .3s;position:relative;background:#fafafa}
+.stat.active{box-shadow:0 0 0 2px #3498db;background:#f0f8ff}
+.stat.me::after{content:"你";position:absolute;top:-8px;right:-8px;background:#e74c3c;color:#fff;font-size:12px;padding:2px 6px;border-radius:10px}
+.stat h3{margin-bottom:6px;font-size:16px}.stat.black h3{color:#000}.stat.white h3{color:#666}
+.stat p{font-size:13px;color:#555;margin:2px 0}
+.skill-desc{font-size:11px;color:#888;line-height:1.4;margin-top:6px;padding-top:6px;border-top:1px dashed #eee}
+.main{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;animation:fu .6s ease .3s forwards;opacity:0}
+.board{display:grid;grid-template-columns:repeat(15,40px);grid-template-rows:repeat(15,40px);background-color:#deb887;background-image:linear-gradient(to right,#8b7355 1px,transparent 1px),linear-gradient(to bottom,#8b7355 1px,transparent 1px);background-size:40px 40px;background-position:20px 20px;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.2);transition:box-shadow .3s}
+.board.domain{animation:dp 1.5s infinite}
+@keyframes dp{0%,100%{box-shadow:0 0 20px 5px rgba(255,215,0,.6)}50%{box-shadow:0 0 40px 10px rgba(255,215,0,.9)}}
+.cell{width:40px;height:40px;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#d32f2f;font-weight:bold;z-index:1}
+.cell:hover{background:rgba(255,255,255,.2);border-radius:50%}
+.cell::before{content:"";position:absolute;width:32px;height:32px;border-radius:50%;z-index:2;transform:scale(0);transition:transform .15s ease-out}
+.cell.black::before{background:radial-gradient(circle at 30% 30%,#555,#000);box-shadow:2px 2px 4px rgba(0,0,0,.3);transform:scale(1)}
+.cell.white::before{background:radial-gradient(circle at 30% 30%,#fff,#ddd);border:1px solid #bbb;box-shadow:2px 2px 4px rgba(0,0,0,.2);transform:scale(1)}
+.cell.copy::before{animation:ci .4s ease}
+.cell.blast::after,.cell.thunder::after{content:"";position:absolute;inset:0;border-radius:50%;animation:fl .5s ease forwards;z-index:4}
+.cell.blast::after{background:rgba(255,80,80,.7)}
+.cell.thunder::after{background:radial-gradient(circle,#fff700 0%,#ffaa00 60%,transparent 100%)}
+.cell.bomb{background:rgba(255,0,0,.35);border-radius:4px}
+.cell.sel{background:rgba(0,200,0,.4);border-radius:4px}
+.skills{display:flex;flex-direction:column;gap:10px;background:#fff;padding:15px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);min-width:160px}
+.skills h3{text-align:center;margin-bottom:10px;font-size:16px}
+.btn{padding:10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;transition:background .2s;display:none;color:#fff}
+.btn.skill{background:#3498db}.btn.skill:hover:not(:disabled){background:#2980b9}.btn.skill:disabled{background:#bdc3c7;cursor:not-allowed}
+.btn.cancel{background:#e74c3c;margin-top:10px;display:block}.btn.cancel:hover{background:#c0392b}
+.btn.back{background:#27ae60;margin-top:auto;display:block}.btn.back:hover{background:#229954}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);justify-content:center;align-items:center;z-index:1000}
+.modal.show{display:flex;animation:mi .3s ease}
+.modal-box{background:#fff;padding:30px;border-radius:8px;text-align:center;min-width:300px}
+.modal-box h3{margin-bottom:20px}
+.mode-list{display:flex;flex-direction:column;gap:12px;margin-top:20px}
+.btn.mode{display:block;width:100%;background:#3498db;padding:14px;font-size:16px}.btn.mode:hover{background:#2980b9}
+.btn.mode.random{background:#9b59b6}.btn.mode.random:hover{background:#8e44ad}
+.input{width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:6px;font-size:14px}
+.room-id{font-size:18px;font-weight:bold;color:#e67e22;margin:10px 0;letter-spacing:2px;user-select:all}
+.tip{margin-top:15px;color:#666;font-size:14px;display:none}.tip.show{display:block}
+.skill-list{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:20px}
+.skill-card{border:2px solid #ddd;border-radius:8px;padding:15px;cursor:pointer;transition:all .2s;text-align:left}
+.skill-card:hover{border-color:#3498db;background:#f0f8ff}
+.skill-card h4{margin-bottom:8px;color:#2c3e50;font-size:15px}
+.skill-card p{font-size:12px;color:#666;margin:3px 0}
+.skill-card .num{color:#e67e22;font-weight:bold;margin-top:6px}
+.rps-list{display:flex;gap:15px;justify-content:center;margin-top:20px}
+.rps-btn{padding:15px 20px;font-size:24px;border:2px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;transition:all .2s}
+.rps-btn:hover{border-color:#3498db;background:#f0f8ff}
+@keyframes fl{0%{transform:scale(.5);opacity:0}30%{transform:scale(1.3);opacity:1}100%{transform:scale(1.8);opacity:0}}
+@keyframes ci{0%{transform:scale(0);opacity:0}50%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+@keyframes mi{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+</style>
 </head>
 <body>
-    <div class="watermark">刘</div>
-    <div class="container">
-        <h1>技能五子棋</h1>
-        <div class="online-count" id="onlineCount">累计游玩人次：加载中...</div>
-        <div class="identity-tip" id="identityTip"></div>
-        <div class="game-info">
-            <div id="status" class="status-black">请选择游戏模式</div>
-            <div class="player-stats">
-                <div id="bStat" class="stat black">
-                    <h3>黑方（先手）</h3>
-                    <p>次数：<span id="bCnt">-</span></p>
-                    <div class="skill-desc" id="bDesc">未选择技能</div>
-                </div>
-                <div id="wStat" class="stat white">
-                    <h3>白方（后手）</h3>
-                    <p>次数：<span id="wCnt">-</span></p>
-                    <div class="skill-desc" id="wDesc">未选择技能</div>
-                </div>
-            </div>
-        </div>
-        <div class="main">
-            <div id="board" class="board"></div>
-            <div class="skills">
-                <h3>技能面板</h3>
-                <button id="btnBlast" class="btn skill">爆破专家</button>
-                <button id="btnCopy" class="btn skill">复制</button>
-                <button id="btnSed" class="btn skill">沉淀蓄力</button>
-                <button id="btnThunder" class="btn skill">引雷</button>
-                <button id="btnRps" class="btn skill">赌徒</button>
-                <button id="btnCancel" class="btn cancel">取消技能</button>
-                <button id="btnBack" class="btn back">返回主菜单</button>
-            </div>
-        </div>
-    </div>
+<div class="watermark">刘</div>
+<div class="container">
+<h1>技能五子棋</h1>
+<div class="online-count" id="oc">累计游玩人次：加载中...</div>
+<div class="identity-tip" id="itip"></div>
+<div class="game-info">
+<div id="status" class="status-black">请选择游戏模式</div>
+<div class="player-stats">
+<div id="bs" class="stat black"><h3>黑方（先手）</h3><p>次数：<span id="bc">-</span></p><div class="skill-desc" id="bd">未选择技能</div></div>
+<div id="ws" class="stat white"><h3>白方（后手）</h3><p>次数：<span id="wc">-</span></p><div class="skill-desc" id="wd">未选择技能</div></div>
+</div></div>
+<div class="main">
+<div id="board" class="board"></div>
+<div class="skills">
+<h3>技能面板</h3>
+<button id="btnBlast" class="btn skill">爆破专家</button>
+<button id="btnCopy" class="btn skill">复制</button>
+<button id="btnSed" class="btn skill">沉淀蓄力</button>
+<button id="btnThunder" class="btn skill">引雷</button>
+<button id="btnDomain" class="btn skill">绝对领域</button>
+<button id="btnRps" class="btn skill">赌徒</button>
+<button id="btnCancel" class="btn cancel">取消技能</button>
+<button id="btnBack" class="btn back">返回主菜单</button>
+</div></div></div>
 
-    <!-- 弹窗 -->
-    <div id="modeModal" class="modal show">
-        <div class="modal-box" style="min-width: 400px;">
-            <h3>选择游戏模式</h3>
-            <div class="mode-list">
-                <button class="btn mode" data-mode="local">本地双人对战</button>
-                <button class="btn mode" data-mode="ai">人机对战（你执黑）</button>
-                <button class="btn mode random" data-mode="random">联机随机匹配</button>
-                <button class="btn mode" data-mode="create">创建房间（你执黑）</button>
-                <button class="btn mode" data-mode="join">加入房间（你执白）</button>
-            </div>
-            <div id="createArea" style="display: none; margin-top: 15px;">
-                <p>你的房间号：</p>
-                <div class="room-id" id="roomId">生成中...</div>
-                <p>等待对手加入中...</p>
-            </div>
-            <div id="joinArea" style="display: none; margin-top: 15px;">
-                <input type="text" class="input" id="joinInput" placeholder="请输入对方房间号">
-                <button class="btn mode" id="joinBtn">加入房间</button>
-            </div>
-            <div class="tip" id="matchTip">正在匹配对手，请稍候...</div>
-        </div>
-    </div>
+<div id="modeModal" class="modal show"><div class="modal-box" style="min-width:400px">
+<h3>选择游戏模式</h3>
+<div class="mode-list">
+<button class="btn mode" data-mode="local">本地双人对战</button>
+<button class="btn mode" data-mode="ai">人机对战（你执黑）</button>
+<button class="btn mode random" data-mode="random">联机随机匹配</button>
+<button class="btn mode" data-mode="create">创建房间（你执黑）</button>
+<button class="btn mode" data-mode="join">加入房间（你执白）</button>
+</div>
+<div id="createArea" style="display:none;margin-top:15px"><p>你的房间号：</p><div class="room-id" id="roomId">生成中...</div><p>等待对手加入中...</p></div>
+<div id="joinArea" style="display:none;margin-top:15px"><input type="text" class="input" id="joinInput" placeholder="请输入对方房间号"><button class="btn mode" id="joinBtn">加入房间</button></div>
+<div class="tip" id="matchTip">正在匹配对手，请稍候...</div>
+</div></div>
 
-    <div id="skillModal" class="modal">
-        <div class="modal-box" style="min-width: 520px;">
-            <h3 id="skillTip">选择你的技能</h3>
-            <div class="skill-list">
-                <div class="skill-card" data-skill="blast">
-                    <h4>爆破专家</h4>
-                    <p>放置标记，2回合后爆炸清除3×3范围棋子</p>
-                    <p class="num">先手3次 / 后手4次 | 首回合禁用</p>
-                </div>
-                <div class="skill-card" data-skill="copy">
-                    <h4>复制</h4>
-                    <p>复制己方最多3连棋子到空位，需间隔1格</p>
-                    <p class="num">双方各2次 | 开局禁用</p>
-                </div>
-                <div class="skill-card" data-skill="sediment">
-                    <h4>沉淀</h4>
-                    <p>放弃回合蓄力，下次落子一次性下多颗</p>
-                    <p class="num">无次数限制 | 最多3层 | 首回合禁用</p>
-                </div>
-                <div class="skill-card" data-skill="thunder">
-                    <h4>引雷</h4>
-                    <p>召唤10-15道落雷，随机击毁场上棋子</p>
-                    <p class="num">双方各2次 | 我方50%免疫 | 开局禁用</p>
-                </div>
-                <div class="skill-card" data-skill="gambler">
-                    <h4>赌徒</h4>
-                    <p>猜拳博弈，赢获增益输受惩罚</p>
-                    <p class="num">双方各2次 | 开局禁用</p>
-                </div>
-            </div>
-        </div>
-    </div>
+<div id="skillModal" class="modal"><div class="modal-box" style="min-width:520px">
+<h3 id="skillTip">选择你的技能</h3>
+<div class="skill-list">
+<div class="skill-card" data-skill="blast"><h4>爆破专家</h4><p>1回合爆炸清3×3，中心占为己有</p><p class="num">先手4次 / 后手5次 | 首回合禁用</p></div>
+<div class="skill-card" data-skill="copy"><h4>复制</h4><p>复制己方最多4连棋子到空位</p><p class="num">双方各3次 | 开局禁用</p></div>
+<div class="skill-card" data-skill="sediment"><h4>沉淀</h4><p>放弃回合蓄力，下次落子一次性下多颗</p><p class="num">无限制 | 最多4层 | 首回合禁用</p></div>
+<div class="skill-card" data-skill="thunder"><h4>引雷</h4><p>全棋盘随机落雷，我方40%免疫</p><p class="num">双方各3次 | 开局禁用</p></div>
+<div class="skill-card" data-skill="domain"><h4>绝对领域</h4><p>封禁敌方技能+暂停炸弹，获额外落子</p><p class="num">双方各1次 | 持续4回合</p></div>
+<div class="skill-card" data-skill="gambler"><h4>赌徒</h4><p>猜拳博弈，赢双倍增益输惩罚</p><p class="num">双方各3次 | 开局禁用</p></div>
+</div></div></div>
 
-    <div id="rpsModal" class="modal">
-        <div class="modal-box">
-            <h3>剪刀石头布</h3>
-            <p id="rpsTip">请选择出拳</p>
-            <div class="rps-list">
-                <button class="rps-btn" data-choice="rock">✊ 石头</button>
-                <button class="rps-btn" data-choice="scissors">✌️ 剪刀</button>
-                <button class="rps-btn" data-choice="paper">✋ 布</button>
-            </div>
-        </div>
-    </div>
+<div id="rpsModal" class="modal"><div class="modal-box">
+<h3>剪刀石头布</h3><p id="rpsTip">请选择出拳</p>
+<div class="rps-list">
+<button class="rps-btn" data-choice="rock">✊ 石头</button>
+<button class="rps-btn" data-choice="scissors">✌️ 剪刀</button>
+<button class="rps-btn" data-choice="paper">✋ 布</button>
+</div></div></div>
 
-    <div id="buffModal" class="modal">
-        <div class="modal-box">
-            <h3>赌徒胜利！选择增益</h3>
-            <button class="btn skill" id="buffExtra" style="display: block; width: 100%; margin: 10px 0;">本回合额外落1子</button>
-            <button class="btn skill" id="buffRestore" style="display: block; width: 100%; margin: 10px 0;">恢复1次自身技能次数</button>
-        </div>
-    </div>
+<div id="buffModal" class="modal"><div class="modal-box">
+<h3>赌徒胜利！选择增益</h3>
+<button class="btn skill" id="buffExtra" style="display:block;width:100%;margin:10px 0;">本回合额外落2子</button>
+<button class="btn skill" id="buffRestore" style="display:block;width:100%;margin:10px 0;">恢复2次自身技能次数</button>
+</div></div>
 
-    <script>
-        const S = 15, EMP = 0, B = 1, W = 2;
-        const SKILL = {
-            blast: { name: "爆破专家", desc: "2回合后爆炸清3×3棋子", limit: "首回合禁用" },
-            copy: { name: "复制", desc: "复制最多3连棋，需间隔1格", limit: "开局前3手禁用" },
-            sediment: { name: "沉淀", desc: "蓄力后一次落多子", limit: "首回合禁用，最多3层" },
-            thunder: { name: "引雷", desc: "落雷随机击毁棋子，我方半免疫", limit: "开局前3手禁用" },
-            gambler: { name: "赌徒", desc: "猜拳赢增益输惩罚", limit: "开局前2手禁用" }
-        };
-        const BTN = { blast: "btnBlast", copy: "btnCopy", sediment: "btnSed", thunder: "btnThunder", gambler: "btnRps" };
-        const FX = ["blast", "thunder", "copy"]; // 特效类列表
-        const MATCH_NS = "gomoku-skill-match-queue";
+<script>
+const S=15, EMP=0, BLACK=1, WHITE=2;
+const SKILL_CFG = {
+    blast: {name:"爆破专家", desc:"1回合爆炸清3×3，中心占为己有", limit:"首回合禁用"},
+    copy: {name:"复制", desc:"复制最多4连棋，需间隔1格", limit:"开局前3手禁用"},
+    sediment: {name:"沉淀", desc:"蓄力后一次落多子，最多4层", limit:"首回合禁用"},
+    thunder: {name:"引雷", desc:"全棋盘落雷，我方40%免疫", limit:"开局前3手禁用"},
+    domain: {name:"绝对领域", desc:"封敌技能+停炸弹，获额外落子", limit:"1次，持续4回合"},
+    gambler: {name:"赌徒", desc:"猜拳赢双倍增益输惩罚", limit:"开局前2手禁用"}
+};
+const BTN_ID = {
+    blast:"btnBlast", copy:"btnCopy", sediment:"btnSed",
+    thunder:"btnThunder", domain:"btnDomain", gambler:"btnRps"
+};
+const FX_CLASS = ["blast", "thunder", "copy"];
+const MATCH_NS = "gomoku-skill-match-queue";
 
-        let mode = "local", isHost = false, peer = null, conn = null;
-        let board = [], cur = B, over = false, phase = "modeSelect";
-        let copySrc = [], copyDir = null, bombs = [];
-        let extra = false, extraUsed = false;
-        let rps = { active: false, from: null, a: null, b: null, draw: 0 };
-        const data = {
-            [B]: { skill: null, cnt: 0, sed: 0, drop: 0 },
-            [W]: { skill: null, cnt: 0, sed: 0, drop: 0 }
-        };
+let mode = "local", isHost = false, peer = null, conn = null;
+let board = [], current = BLACK, gameOver = false, phase = "modeSelect";
+let copySrc = [], copyDir = null, bombs = [];
+let extraMoves = 0;
+let domain = { active:false, owner:null, turnsLeft:0 };
+let rpsState = { active:false, from:null, a:null, b:null, draw:0 };
+const playerData = {
+    [BLACK]: { skill:null, count:0, sed:0, drop:0 },
+    [WHITE]: { skill:null, count:0, sed:0, drop:0 }
+};
 
-        const $ = id => document.getElementById(id);
-        const statusEl = $("status"), boardEl = $("board");
+const $ = id => document.getElementById(id);
+const statusEl = $("status");
+const boardEl = $("board");
 
-        initBoard();
-        fetchOnline();
+// 初始化
+initBoard();
+fetchOnlineCount();
 
-        function fetchOnline() {
-            fetch("https://api.countapi.xyz/hit/gomoku-skill-game/visitors")
-                .then(r => r.json())
-                .then(d => $("onlineCount").textContent = `累计游玩人次：${d.value} 人`)
-                .catch(() => $("onlineCount").textContent = "在线人数加载失败");
+// 事件绑定
+document.querySelectorAll(".btn.mode[data-mode]").forEach(btn => {
+    btn.onclick = () => {
+        const m = btn.dataset.mode;
+        if (m === "random") return startMatch();
+        mode = m;
+        if (m === "local" || m === "ai") {
+            $("modeModal").classList.remove("show");
+            showIdentity();
+            openSkillSelect();
+        } else if (m === "create") {
+            if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新页面");
+            createRoom();
+        } else if (m === "join") {
+            if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新页面");
+            $("joinArea").style.display = "block";
         }
+    };
+});
 
-        function showIdentity() {
-            const tip = $("identityTip");
-            if (mode === "online") {
-                tip.style.display = "block";
-                tip.textContent = isHost ? "你是黑方（先手）" : "你是白方（后手）";
-                tip.className = `identity-tip ${isHost ? "black" : "white"}`;
-                $("bStat").classList.toggle("me", isHost);
-                $("wStat").classList.toggle("me", !isHost);
-            } else if (mode === "ai") {
-                tip.style.display = "block";
-                tip.textContent = "你是黑方（先手）";
-                tip.className = "identity-tip black";
-                $("bStat").classList.add("me");
-            } else {
-                tip.style.display = "none";
-                $("bStat").classList.remove("me");
-                $("wStat").classList.remove("me");
+document.querySelectorAll(".skill-card").forEach(card => {
+    card.onclick = () => {
+        const skill = card.dataset.skill;
+        if (mode === "ai") {
+            playerData[BLACK].skill = skill;
+            setSkillCount(BLACK, skill);
+            const aiPool = ["blast", "copy", "sediment", "thunder", "domain"];
+            playerData[WHITE].skill = aiPool[Math.floor(Math.random()*aiPool.length)];
+            setSkillCount(WHITE, playerData[WHITE].skill);
+            $("skillModal").classList.remove("show");
+            phase = "normal";
+            onSkillReady();
+        } else if (mode === "online") {
+            const me = isHost ? BLACK : WHITE;
+            playerData[me].skill = skill;
+            setSkillCount(me, skill);
+            sendSync("skillSelect", skill);
+            updateDesc();
+            updateUI();
+            $("skillTip").textContent = "已选择完成，等待对方选择技能...";
+            const opp = isHost ? WHITE : BLACK;
+            if (playerData[opp].skill) {
+                $("skillModal").classList.remove("show");
+                phase = "normal";
+                onSkillReady();
+            }
+        } else {
+            if (!playerData[BLACK].skill) {
+                playerData[BLACK].skill = skill;
+                setSkillCount(BLACK, skill);
+                $("skillTip").textContent = "白方请选择技能";
+                updateDesc();
+                updateUI();
+            } else if (!playerData[WHITE].skill) {
+                playerData[WHITE].skill = skill;
+                setSkillCount(WHITE, skill);
+                $("skillModal").classList.remove("show");
+                phase = "normal";
+                onSkillReady();
             }
         }
+    };
+});
 
-        // 模式选择
-        document.querySelectorAll(".btn.mode[data-mode]").forEach(btn => {
-            btn.onclick = () => {
-                const m = btn.dataset.mode;
-                if (m === "random") return startMatch();
-                mode = m;
-                if (m === "local" || m === "ai") {
-                    $("modeModal").classList.remove("show");
-                    showIdentity();
-                    startSkillSelect();
-                } else if (m === "create") {
-                    if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新");
-                    createRoom();
-                } else if (m === "join") {
-                    if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新");
-                    $("joinArea").style.display = "block";
-                }
-            };
+document.querySelectorAll(".rps-btn").forEach(btn => {
+    btn.onclick = () => {
+        const choice = btn.dataset.choice;
+        if (!rpsState.a) {
+            rpsState.a = choice;
+            if (mode === "ai" && rpsState.from === BLACK) {
+                const opts = ["rock", "scissors", "paper"];
+                rpsState.b = opts[Math.floor(Math.random()*3)];
+                resolveRps();
+                return;
+            }
+            const opp = rpsState.from === BLACK ? "白方" : "黑方";
+            $("rpsTip").textContent = `${opp}请选择出拳`;
+        } else {
+            rpsState.b = choice;
+            resolveRps();
+        }
+    };
+});
+
+// 技能按钮事件
+$("btnBlast").onclick = () => {
+    if (cantUseSkill("blast")) return;
+    phase = "placingBlast";
+    setStatus("请点击空位放置爆破标记");
+};
+
+$("btnCopy").onclick = () => {
+    if (cantUseSkill("copy")) return;
+    if (totalPieces() < (current === BLACK ? 5 : 4)) return setStatus("开局阶段禁止使用复制");
+    phase = "selectingCopySource";
+    copySrc = [];
+    setStatus("请点击己方棋子选择要复制的棋组");
+};
+
+$("btnSed").onclick = () => {
+    if (cantUseSkill("sediment")) return;
+    if (playerData[current].sed >= 4) return setStatus("沉淀层数已达上限");
+    if (current === BLACK && isBoardEmpty()) return setStatus("首回合禁止使用沉淀");
+    playerData[current].sed++;
+    if (isMyTurn() && mode !== "local") sendSync("skill", "sediment");
+    setStatus(`放弃本回合，沉淀层数增加至 ${playerData[current].sed} 层`);
+    statusEl.classList.add("glow");
+    setTimeout(() => statusEl.classList.remove("glow"), 800);
+    updateUI();
+    endTurn();
+};
+
+$("btnThunder").onclick = () => {
+    if (cantUseSkill("thunder")) return;
+    if (totalPieces() < 5) return setStatus("场上棋子太少，无法引雷");
+    castThunder();
+};
+
+$("btnDomain").onclick = () => {
+    if (cantUseSkill("domain")) return;
+    if (totalPieces() < 4) return setStatus("开局阶段禁止使用领域");
+    castDomain();
+};
+
+$("btnRps").onclick = () => {
+    if (cantUseSkill("gambler")) return;
+    if (totalPieces() < (current === BLACK ? 2 : 1)) return setStatus("开局阶段禁止使用赌徒");
+    rpsState = { active:true, from:current, a:null, b:null, draw:0 };
+    $("rpsModal").classList.add("show");
+    $("rpsTip").textContent = "请选择出拳";
+};
+
+$("btnCancel").onclick = () => {
+    if (phase === "normal" || phase === "skillSelect" || phase === "modeSelect") return;
+    phase = "normal";
+    copySrc = [];
+    render();
+    setStatus(`已取消技能，当前回合：${current === BLACK ? "黑方" : "白方"}`);
+};
+
+$("btnBack").onclick = () => {
+    if (peer) { peer.destroy(); peer = null; conn = null; }
+    $("itip").style.display = "none";
+    $("matchTip").classList.remove("show");
+    $("modeModal").classList.add("show");
+    $("createArea").style.display = "none";
+    $("joinArea").style.display = "none";
+    $("joinInput").value = "";
+    phase = "modeSelect";
+    mode = "local";
+    initBoard();
+    setStatus("请选择游戏模式");
+};
+
+$("joinBtn").onclick = () => {
+    const rid = $("joinInput").value.trim();
+    if (!rid) return alert("请输入房间号");
+    isHost = false;
+    mode = "online";
+    peer = new Peer();
+    peer.on("open", () => {
+        conn = peer.connect(rid);
+        conn.on("open", () => {
+            setupConnection();
+            $("modeModal").classList.remove("show");
+            showIdentity();
+            openSkillSelect();
         });
+    });
+    peer.on("error", e => alert("加入失败：" + e.type));
+};
 
-        // 随机匹配
-        async function startMatch() {
-            if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新");
-            $("matchTip").classList.add("show");
-            try {
-                const res = await fetch(`https://api.countapi.xyz/hit/${MATCH_NS}/queue`);
-                const num = (await res.json()).value;
-                const rid = `match-${Math.floor((num + 1) / 2)}`;
-                if (num % 2 === 1) {
-                    isHost = true; mode = "online";
-                    peer = new Peer(rid);
-                    peer.on("open", () => {
-                        $("roomId").textContent = rid;
-                        $("createArea").style.display = "block";
-                    });
-                    peer.on("connection", c => {
-                        conn = c; setupConn();
-                        $("matchTip").classList.remove("show");
-                        $("modeModal").classList.remove("show");
-                        showIdentity();
-                        startSkillSelect();
-                    });
-                    peer.on("error", e => {
-                        if (e.type === "unavailable-id") joinMatch(rid);
-                        else { alert("匹配失败"); $("matchTip").classList.remove("show"); }
-                    });
-                } else joinMatch(rid);
-            } catch {
-                alert("匹配服务异常，请稍后重试");
-                $("matchTip").classList.remove("show");
+$("buffExtra").onclick = () => {
+    extraMoves += 2;
+    $("buffModal").classList.remove("show");
+    setStatus("赌徒胜利！获得2次额外落子");
+};
+
+$("buffRestore").onclick = () => {
+    const p = window.buffPlayer;
+    const s = playerData[p].skill;
+    const max = s === "blast" ? (p === BLACK ? 4 : 5) : s === "domain" ? 1 : 3;
+    if (playerData[p].count + 2 <= max) {
+        playerData[p].count += 2;
+        setStatus(`赌徒胜利！恢复2次${SKILL_CFG[s].name}次数`);
+    } else {
+        extraMoves += 2;
+        setStatus("技能次数已满，改为2次额外落子");
+    }
+    $("buffModal").classList.remove("show");
+    updateUI();
+};
+
+// 核心函数
+function initBoard() {
+    board = Array(S).fill().map(() => Array(S).fill(EMP));
+    boardEl.innerHTML = "";
+    for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            cell.onclick = () => onCellClick(x, y);
+            boardEl.appendChild(cell);
+        }
+    }
+    bombs = [];
+    gameOver = false;
+    current = BLACK;
+    extraMoves = 0;
+    domain = { active:false, owner:null, turnsLeft:0 };
+    playerData[BLACK] = { skill:null, count:0, sed:0, drop:0 };
+    playerData[WHITE] = { skill:null, count:0, sed:0, drop:0 };
+    document.querySelectorAll(".btn.skill").forEach(b => b.style.display = "none");
+    boardEl.classList.remove("domain");
+    render();
+    updateUI();
+}
+
+function fetchOnlineCount() {
+    fetch("https://api.countapi.xyz/hit/gomoku-skill-game/visitors")
+        .then(r => r.json())
+        .then(d => $("oc").textContent = `累计游玩人次：${d.value} 人`)
+        .catch(() => $("oc").textContent = "在线人数加载失败");
+}
+
+function showIdentity() {
+    const tip = $("itip");
+    if (mode === "online") {
+        tip.style.display = "block";
+        tip.textContent = isHost ? "你是黑方（先手）" : "你是白方（后手）";
+        tip.className = `identity-tip ${isHost ? "black" : "white"}`;
+        $("bs").classList.toggle("me", isHost);
+        $("ws").classList.toggle("me", !isHost);
+    } else if (mode === "ai") {
+        tip.style.display = "block";
+        tip.textContent = "你是黑方（先手）";
+        tip.className = "identity-tip black";
+        $("bs").classList.add("me");
+    } else {
+        tip.style.display = "none";
+        $("bs").classList.remove("me");
+        $("ws").classList.remove("me");
+    }
+}
+
+function openSkillSelect() {
+    phase = "skillSelect";
+    $("skillModal").classList.add("show");
+    let text = "黑方请选择技能";
+    if (mode === "ai") text = "请选择你的技能（执黑先手）";
+    else if (mode === "online") text = isHost ? "请选择你的技能（黑方）" : "请选择你的技能（白方）";
+    $("skillTip").textContent = text;
+}
+
+function onSkillReady() {
+    updateDesc();
+    setStatus("游戏开始！当前回合：黑方");
+    refreshSkillButtons();
+    updateUI();
+    if (mode === "ai" && current === WHITE) setTimeout(aiMove, 800);
+}
+
+function setSkillCount(p, skill) {
+    if (skill === "blast") playerData[p].count = p === BLACK ? 4 : 5;
+    else if (skill === "domain") playerData[p].count = 1;
+    else if (skill === "sediment") playerData[p].count = Infinity;
+    else playerData[p].count = 3;
+}
+
+function updateDesc() {
+    ["bd", "wd"].forEach((id, i) => {
+        const p = i ? WHITE : BLACK;
+        const s = playerData[p].skill;
+        if (!s) { $(id).textContent = "未选择技能"; return; }
+        const cfg = SKILL_CFG[s];
+        $(id).innerHTML = `${cfg.name}：${cfg.desc}<br>限制：${cfg.limit}`;
+    });
+}
+
+function refreshSkillButtons() {
+    document.querySelectorAll(".btn.skill").forEach(b => b.style.display = "none");
+    let p = current;
+    if (mode === "online") {
+        const me = isHost ? BLACK : WHITE;
+        if (current !== me) return;
+        p = me;
+    } else if (mode === "ai" && current === WHITE) return;
+
+    if (domain.active && domain.owner !== p) return;
+
+    const s = playerData[p].skill;
+    if (s && BTN_ID[s]) $(BTN_ID[s]).style.display = "block";
+}
+
+function cantUseSkill(skillName) {
+    return playerData[current].skill !== skillName || gameOver || phase !== "normal" || playerData[current].count <= 0;
+}
+
+function isMyTurn() {
+    return mode !== "online" || current === (isHost ? BLACK : WHITE);
+}
+
+function onCellClick(x, y) {
+    if (gameOver || phase === "skillSelect" || phase === "modeSelect") return;
+    if (mode === "online" && !isMyTurn()) return;
+    if (mode === "ai" && current === WHITE) return;
+
+    switch (phase) {
+        case "normal": dropPiece(x, y); break;
+        case "placingBlast": placeBomb(x, y, true); break;
+        case "selectingCopySource": selectCopySource(x, y); break;
+        case "selectingCopyTarget": selectCopyTarget(x, y); break;
+        case "sedimentBurst": sedimentDrop(x, y); break;
+    }
+}
+
+function dropPiece(x, y) {
+    if (board[y][x] !== EMP) return;
+    board[y][x] = current;
+    render();
+    if (isMyTurn() && mode !== "local") sendSync("move", {x, y});
+    if (checkWin(x, y, current)) return endGame(current);
+
+    if (extraMoves > 0) {
+        extraMoves--;
+        setStatus(`额外落子机会，剩余${extraMoves}次`);
+        return;
+    }
+
+    if (playerData[current].skill === "sediment" && playerData[current].sed > 0) {
+        playerData[current].drop = playerData[current].sed;
+        phase = "sedimentBurst";
+        setStatus(`沉淀爆发！还需放置 ${playerData[current].drop} 颗棋子`);
+        statusEl.classList.add("glow");
+        updateUI();
+        if (mode === "ai" && current === WHITE) setTimeout(aiMove, 500);
+        return;
+    }
+    endTurn();
+}
+
+function sedimentDrop(x, y) {
+    if (board[y][x] !== EMP) return;
+    board[y][x] = current;
+    render();
+    if (isMyTurn() && mode !== "local") sendSync("move", {x, y});
+    if (checkWin(x, y, current)) return endGame(current);
+
+    playerData[current].drop--;
+    if (playerData[current].drop > 0) {
+        setStatus(`沉淀爆发！还需放置 ${playerData[current].drop} 颗棋子`);
+        if (mode === "ai" && current === WHITE) setTimeout(aiMove, 500);
+    } else {
+        playerData[current].sed = 0;
+        phase = "normal";
+        statusEl.classList.remove("glow");
+        endTurn();
+    }
+    updateUI();
+}
+
+function placeBomb(x, y, isCaster) {
+    if (board[y][x] !== EMP) return setStatus("只能在空位放置标记");
+    if (bombs.some(m => m.x === x && m.y === y)) return setStatus("该位置已有标记");
+    bombs.push({ x, y, owner: current, left: 1 });
+
+    if (isCaster) {
+        playerData[current].count--;
+        phase = "normal";
+        if (isMyTurn() && mode !== "local") sendSync("skill", { name:"blast", x, y });
+        setStatus("爆破标记已放置，1回合后爆炸");
+        render();
+        updateUI();
+        endTurn();
+    }
+}
+
+function selectCopySource(x, y) {
+    if (board[y][x] !== current) return setStatus("请选择己方棋子");
+    const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    let maxLine = [{x,y}], maxDir = [1,0];
+
+    for (const [dx, dy] of dirs) {
+        const line = [{x,y}];
+        let nx = x+dx, ny = y+dy;
+        while (nx>=0 && nx<S && ny>=0 && ny<S && board[ny][nx]===current && line.length<4) {
+            line.push({x:nx, y:ny});
+            nx += dx; ny += dy;
+        }
+        nx = x-dx; ny = y-dy;
+        while (nx>=0 && nx<S && ny>=0 && ny<S && board[ny][nx]===current && line.length<4) {
+            line.unshift({x:nx, y:ny});
+            nx -= dx; ny -= dy;
+        }
+        if (line.length > maxLine.length) {
+            maxLine = line;
+            maxDir = [dx, dy];
+        }
+    }
+
+    copySrc = maxLine;
+    copyDir = maxDir;
+    phase = "selectingCopyTarget";
+    render();
+    setStatus(`已选中${maxLine.length}颗棋子，请点击目标空位`);
+}
+
+function selectCopyTarget(x, y) {
+    const targets = [];
+    const [dx, dy] = copyDir;
+    for (let i = 0; i < copySrc.length; i++) {
+        targets.push({ x: x + i*dx, y: y + i*dy });
+    }
+
+    for (const t of targets) {
+        if (t.x<0 || t.x>=S || t.y<0 || t.y>=S) return setStatus("目标超出棋盘");
+        if (board[t.y][t.x] !== EMP || bombs.some(m => m.x===t.x && m.y===t.y))
+            return setStatus("目标位置必须为空");
+    }
+
+    let hasGap = true;
+    for (const s of copySrc) {
+        for (const t of targets) {
+            if (Math.abs(s.x-t.x) <= 1 && Math.abs(s.y-t.y) <= 1) {
+                hasGap = false;
+                break;
             }
         }
+        if (!hasGap) break;
+    }
+    if (!hasGap) return setStatus("必须与原棋组至少间隔1格");
 
-        function joinMatch(rid) {
-            isHost = false; mode = "online";
-            peer = new Peer();
-            peer.on("open", () => {
-                conn = peer.connect(rid);
-                conn.on("open", () => {
-                    $("matchTip").classList.remove("show");
-                    $("modeModal").classList.remove("show");
-                    showIdentity();
-                    startSkillSelect();
-                });
-                conn.on("error", () => { alert("匹配失败，对手已离开"); $("matchTip").classList.remove("show"); });
-            });
-            peer.on("error", e => { alert("匹配失败"); $("matchTip").classList.remove("show"); });
+    targets.forEach(t => board[t.y][t.x] = current);
+    render();
+    addEffect(targets, "copy", 400);
+
+    for (const t of targets) {
+        if (checkWin(t.x, t.y, current)) return endGame(current);
+    }
+
+    playerData[current].count--;
+    copySrc = [];
+    copyDir = null;
+    phase = "normal";
+    setStatus("复制成功");
+    updateUI();
+    endTurn();
+}
+
+function castThunder() {
+    const count = Math.floor(Math.random()*5) + 8;
+    const allPos = [];
+    const posSet = new Set();
+    while (allPos.length < count) {
+        const x = Math.floor(Math.random()*S);
+        const y = Math.floor(Math.random()*S);
+        const key = x * S + y;
+        if (!posSet.has(key)) {
+            posSet.add(key);
+            allPos.push({x, y});
         }
+    }
 
-        // 联机房间
-        function createRoom() {
-            isHost = true; mode = "online";
-            peer = new Peer();
-            peer.on("open", id => {
+    const hitList = [];
+    allPos.forEach(p => {
+        const color = board[p.y][p.x];
+        if (color === EMP) return;
+        const isMine = color === current;
+        if (!(isMine && Math.random() < 0.4)) hitList.push(p);
+    });
+
+    if (isMyTurn() && mode !== "local") {
+        sendSync("skill", { name:"thunder", hitList, allPos });
+    }
+    execThunder(hitList, allPos, true);
+}
+
+function execThunder(hitList, allPos, isCaster) {
+    hitList.forEach(p => board[p.y][p.x] = EMP);
+    render();
+    addEffect(allPos, "thunder", 600);
+
+    if (isCaster) {
+        playerData[current].count--;
+        setStatus(`引雷发动！${hitList.length}颗棋子被击毁`);
+        updateUI();
+        setTimeout(endTurn, 400);
+    }
+}
+
+function castDomain() {
+    if (domain.active) return setStatus("领域已开启");
+    if (isMyTurn() && mode !== "local") sendSync("domain", current);
+    openDomain(current, true);
+}
+
+function openDomain(owner, isCaster) {
+    domain = { active: true, owner, turnsLeft: 4 };
+    boardEl.classList.add("domain");
+    if (isCaster) {
+        playerData[current].count--;
+        extraMoves += 2;
+        setStatus("绝对领域开启！敌方技能已封禁，获得2次额外落子");
+        updateUI();
+    }
+}
+
+function closeDomain() {
+    domain.active = false;
+    boardEl.classList.remove("domain");
+    setStatus("绝对领域消散");
+    refreshSkillButtons();
+}
+
+function addEffect(positions, fxClass, duration) {
+    positions.forEach(p => {
+        const cell = boardEl.children[p.y * S + p.x];
+        cell.classList.add(fxClass);
+        setTimeout(() => cell.classList.remove(fxClass), duration);
+    });
+}
+
+function endTurn() {
+    // 领域计数
+    if (domain.active && current === domain.owner) {
+        domain.turnsLeft--;
+        if (domain.turnsLeft <= 0) closeDomain();
+    }
+
+    // 炸弹倒计时（领域暂停敌方炸弹）
+    bombs.forEach(m => {
+        if (m.owner !== current && !(domain.active && m.owner !== domain.owner)) {
+            m.left--;
+        }
+    });
+
+    const exploded = bombs.filter(m => m.left <= 0);
+    exploded.forEach(m => {
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const x = m.x + dx, y = m.y + dy;
+                if (x >= 0 && x < S && y >= 0 && y < S) board[y][x] = EMP;
+            }
+        }
+        board[m.y][m.x] = m.owner;
+        bombs = bombs.filter(b => !(b.x === m.x && b.y === m.y));
+    });
+
+    render();
+    exploded.forEach(m => {
+        const area = [];
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const x = m.x + dx, y = m.y + dy;
+                if (x >= 0 && x < S && y >= 0 && y < S) area.push({x, y});
+            }
+        }
+        addEffect(area, "blast", 500);
+    });
+
+    current = current === BLACK ? WHITE : BLACK;
+    extraMoves = 0;
+    phase = "normal";
+    refreshSkillButtons();
+    updateUI();
+    setStatus(`当前回合：${current === BLACK ? "黑方" : "白方"}`);
+    if (mode === "ai" && current === WHITE && !gameOver) setTimeout(aiMove, 800);
+}
+
+function checkWin(x, y, player) {
+    const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    for (const [dx, dy] of dirs) {
+        let count = 1;
+        let nx = x + dx, ny = y + dy;
+        while (nx>=0 && nx<S && ny>=0 && ny<S && board[ny][nx] === player) {
+            count++; nx += dx; ny += dy;
+        }
+        nx = x - dx; ny = y - dy;
+        while (nx>=0 && nx<S && ny>=0 && ny<S && board[ny][nx] === player) {
+            count++; nx -= dx; ny -= dy;
+        }
+        if (count >= 5) return true;
+    }
+    return false;
+}
+
+// AI逻辑
+function aiMove() {
+    if (gameOver) return;
+
+    if (phase === "sedimentBurst") {
+        const moves = [];
+        for (let y = 0; y < S; y++) {
+            for (let x = 0; x < S; x++) {
+                if (board[y][x] !== EMP) continue;
+                const sc = evalPosition(x, y, WHITE) + evalPosition(x, y, BLACK) * 0.95;
+                moves.push({x, y, sc});
+            }
+        }
+        moves.sort((a, b) => b.sc - a.sc);
+        if (moves.length) sedimentDrop(moves[0].x, moves[0].y);
+        return;
+    }
+
+    if (phase !== "normal") return;
+    const skill = playerData[WHITE].skill;
+
+    if (!(domain.active && domain.owner !== WHITE)) {
+        if (skill === "blast" && playerData[WHITE].count > 0) {
+            const pos = findBestBlast();
+            if (pos) return placeBomb(pos.x, pos.y, true);
+        }
+        if (skill === "thunder" && playerData[WHITE].count > 0 && totalPieces() > 12) {
+            if (Math.random() < 0.4) return castThunder();
+        }
+        if (skill === "domain" && playerData[WHITE].count > 0 && totalPieces() > 8) {
+            if (Math.random() < 0.35) return castDomain();
+        }
+        if (skill === "sediment" && playerData[WHITE].sed < 3 && totalPieces() > 10) {
+            if (Math.random() < 0.3) {
+                playerData[WHITE].sed++;
+                setStatus("AI选择沉淀蓄力");
+                updateUI();
+                return endTurn();
+            }
+        }
+    }
+
+    let best = -Infinity, moves = [];
+    for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+            if (board[y][x] !== EMP) continue;
+            const sc = evalPosition(x, y, WHITE) + evalPosition(x, y, BLACK) * 0.95;
+            if (sc > best) {
+                best = sc;
+                moves = [{x, y}];
+            } else if (sc === best) {
+                moves.push({x, y});
+            }
+        }
+    }
+    if (moves.length) {
+        const m = moves[Math.floor(Math.random() * moves.length)];
+        dropPiece(m.x, m.y);
+    }
+}
+
+function evalPosition(x, y, player) {
+    const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    let total = 0;
+    for (const [dx, dy] of dirs) {
+        let count = 1, blocked = 0;
+        let nx = x + dx, ny = y + dy;
+        while (nx >= 0 && nx < S && ny >= 0 && ny < S) {
+            if (board[ny][nx] === player) count++;
+            else if (board[ny][nx] === EMP) break;
+            else { blocked++; break; }
+            nx += dx; ny += dy;
+        }
+        if (nx < 0 || nx >= S || ny < 0 || ny >= S) blocked++;
+        nx = x - dx; ny = y - dy;
+        while (nx >= 0 && nx < S && ny >= 0 && ny < S) {
+            if (board[ny][nx] === player) count++;
+            else if (board[ny][nx] === EMP) break;
+            else { blocked++; break; }
+            nx -= dx; ny -= dy;
+        }
+        if (nx < 0 || nx >= S || ny < 0 || ny >= S) blocked++;
+
+        if (count >= 5) total += 100000;
+        else if (count === 4 && blocked === 0) total += 10000;
+        else if (count === 4 && blocked === 1) total += 1000;
+        else if (count === 3 && blocked === 0) total += 1000;
+        else if (count === 3 && blocked === 1) total += 100;
+        else if (count === 2 && blocked === 0) total += 100;
+        else if (count === 2 && blocked === 1) total += 10;
+    }
+    total += (14 - Math.abs(x-7) - Math.abs(y-7)) * 2;
+    return total;
+}
+
+function findBestBlast() {
+    let max = 0, best = null;
+    for (let y = 1; y < S-1; y++) {
+        for (let x = 1; x < S-1; x++) {
+            if (board[y][x] !== EMP) continue;
+            let count = 0;
+            for (let dy = -1; dy <= 1; dy++)
+                for (let dx = -1; dx <= 1; dx++)
+                    if (board[y+dy][x+dx] === BLACK) count++;
+            if (count >= 3 && count > max) {
+                max = count;
+                best = {x, y};
+            }
+        }
+    }
+    return best;
+}
+
+// 渲染与UI
+function render() {
+    const cells = boardEl.children;
+    for (let i = 0; i < cells.length; i++) {
+        const x = i % S, y = Math.floor(i / S);
+        const cell = cells[i];
+        const fxC = FX_CLASS.filter(f => cell.classList.contains(f));
+        cell.className = "cell " + fxC.join(" ");
+        cell.textContent = "";
+
+        if (board[y][x] === BLACK) cell.classList.add("black");
+        else if (board[y][x] === WHITE) cell.classList.add("white");
+
+        const bomb = bombs.find(b => b.x === x && b.y === y);
+        if (bomb) { cell.classList.add("bomb"); cell.textContent = bomb.left; }
+        if (copySrc.some(p => p.x === x && p.y === y)) cell.classList.add("sel");
+    }
+}
+
+function updateUI() {
+    $("bc").textContent = playerData[BLACK].skill === "sediment" ? "无限制" : playerData[BLACK].count;
+    $("wc").textContent = playerData[WHITE].skill === "sediment" ? "无限制" : playerData[WHITE].count;
+    $("bs").classList.toggle("active", current === BLACK);
+    $("ws").classList.toggle("active", current === WHITE);
+
+    const s = playerData[current].skill;
+    if (s && BTN_ID[s]) {
+        const btn = $(BTN_ID[s]);
+        btn.disabled = s === "sediment"
+            ? playerData[current].sed >= 4 || phase !== "normal"
+            : playerData[current].count <= 0 || phase !== "normal";
+    }
+}
+
+function setStatus(text) {
+    statusEl.textContent = text;
+    statusEl.className = current === BLACK ? "status-black" : "status-white";
+}
+
+function endGame(winner) {
+    gameOver = true;
+    closeDomain();
+    setStatus(`游戏结束！${winner === BLACK ? "黑方" : "白方"}获胜！`);
+    document.querySelectorAll(".btn.skill").forEach(b => b.style.display = "none");
+}
+
+function totalPieces() {
+    return board.flat().filter(c => c !== EMP).length;
+}
+
+function isBoardEmpty() {
+    return totalPieces() === 0;
+}
+
+// 联机相关
+async function startMatch() {
+    if (typeof Peer === "undefined") return alert("联机组件加载失败，请刷新页面");
+    $("matchTip").classList.add("show");
+    try {
+        const res = await fetch(`https://api.countapi.xyz/hit/${MATCH_NS}/queue`);
+        const num = (await res.json()).value;
+        const rid = `match-${Math.floor((num + 1) / 2)}`;
+        if (num % 2 === 1) {
+            isHost = true;
+            mode = "online";
+            peer = new Peer(rid);
+            peer.on("open", () => {
+                $("roomId").textContent = rid;
                 $("createArea").style.display = "block";
-                $("roomId").textContent = id;
             });
             peer.on("connection", c => {
-                conn = c; setupConn();
+                conn = c;
+                setupConnection();
+                $("matchTip").classList.remove("show");
                 $("modeModal").classList.remove("show");
                 showIdentity();
-                startSkillSelect();
+                openSkillSelect();
             });
-            peer.on("error", e => alert("创建失败：" + e.type));
-        }
-
-        $("joinBtn").onclick = () => {
-            const rid = $("joinInput").value.trim();
-            if (!rid) return alert("请输入房间号");
-            isHost = false; mode = "online";
-            peer = new Peer();
-            peer.on("open", () => {
-                conn = peer.connect(rid);
-                conn.on("open", () => {
-                    setupConn();
-                    $("modeModal").classList.remove("show");
-                    showIdentity();
-                    startSkillSelect();
-                });
+            peer.on("error", e => {
+                if (e.type === "unavailable-id") joinMatch(rid);
+                else { alert("匹配失败"); $("matchTip").classList.remove("show"); }
             });
-            peer.on("error", e => alert("加入失败：" + e.type));
-        };
-
-        function setupConn() {
-            conn.on("data", d => {
-                if (d.type === "move") remoteMove(d.x, d.y);
-                else if (d.type === "skill") remoteSkill(d.skill, d.payload);
-                else if (d.type === "skillSelect") {
-                    const opp = isHost ? W : B;
-                    data[opp].skill = d.skill;
-                    setCnt(opp, d.skill);
-                    updateDesc(); updateUI();
-                    const me = isHost ? B : W;
-                    if (data[me].skill && phase === "skillSelect") {
-                        $("skillModal").classList.remove("show");
-                        phase = "normal"; finishSkill();
-                    }
-                }
-            });
-            conn.on("close", () => { if (!over) { alert("对手断开连接"); $("btnBack").click(); }});
+        } else {
+            joinMatch(rid);
         }
+    } catch {
+        alert("匹配服务异常，请稍后重试");
+        $("matchTip").classList.remove("show");
+    }
+}
 
-        const sendMove = (x, y) => conn && conn.send({ type: "move", x, y });
-        const sendSkill = (s, p) => conn && conn.send({ type: "skill", skill: s, payload: p });
-        const remoteMove = (x, y) => phase === "normal" ? drop(x, y) : sedDrop(x, y);
-        const remoteSkill = (s, p) => {
-            if (s === "blast") placeBomb(p.x, p.y);
-            else if (s === "sediment") { data[cur].sed++; endTurn(); }
-            else if (s === "thunder") execThunder(p.targets, false);
-        };
-
-        // 棋盘初始化
-        function initBoard() {
-            board = Array(S).fill().map(() => Array(S).fill(EMP));
-            boardEl.innerHTML = "";
-            for (let y = 0; y < S; y++) {
-                for (let x = 0; x < S; x++) {
-                    const c = document.createElement("div");
-                    c.className = "cell"; c.dataset.x = x; c.dataset.y = y;
-                    c.onclick = () => onClick(x, y);
-                    boardEl.appendChild(c);
-                }
-            }
-            bombs = []; over = false; cur = B;
-            extra = extraUsed = false;
-            data[B] = { skill: null, cnt: 0, sed: 0, drop: 0 };
-            data[W] = { skill: null, cnt: 0, sed: 0, drop: 0 };
-            document.querySelectorAll(".btn.skill").forEach(b => b.style.display = "none");
-            render(); updateUI();
-        }
-
-        function startSkillSelect() {
-            phase = "skillSelect";
-            $("skillModal").classList.add("show");
-            let t = "黑方请选择技能";
-            if (mode === "ai") t = "请选择你的技能（执黑先手）";
-            else if (mode === "online") t = isHost ? "请选择你的技能（黑方）" : "请选择你的技能（白方）";
-            $("skillTip").textContent = t;
-        }
-
-        // 技能选择
-        document.querySelectorAll(".skill-card").forEach(card => {
-            card.onclick = () => {
-                const s = card.dataset.skill;
-                if (mode === "ai") {
-                    data[B].skill = s; setCnt(B, s);
-                    const ai = ["blast", "copy", "sediment", "thunder"];
-                    data[W].skill = ai[Math.floor(Math.random()*ai.length)];
-                    setCnt(W, data[W].skill);
-                    $("skillModal").classList.remove("show");
-                    phase = "normal"; finishSkill();
-                } else if (mode === "online") {
-                    const me = isHost ? B : W;
-                    data[me].skill = s; setCnt(me, s);
-                    sendSkill("skillSelect", s);
-                    updateDesc(); updateUI();
-                    $("skillTip").textContent = "已选择完成，等待对方选择技能...";
-                    const opp = isHost ? W : B;
-                    if (data[opp].skill) {
-                        $("skillModal").classList.remove("show");
-                        phase = "normal"; finishSkill();
-                    }
-                } else {
-                    if (!data[B].skill) {
-                        data[B].skill = s; setCnt(B, s);
-                        $("skillTip").textContent = "白方请选择技能";
-                        updateDesc(); updateUI();
-                    } else if (!data[W].skill) {
-                        data[W].skill = s; setCnt(W, s);
-                        $("skillModal").classList.remove("show");
-                        phase = "normal"; finishSkill();
-                    }
-                }
-            };
-        });
-
-        function finishSkill() {
-            updateDesc();
-            setStatus("游戏开始！当前回合：黑方");
-            refreshBtn(); updateUI();
-            if (mode === "ai" && cur === W) setTimeout(aiMove, 800);
-        }
-
-        function setCnt(p, s) {
-            data[p].cnt = s === "blast" ? (p === B ? 3 : 4) : s === "sediment" ? Infinity : 2;
-        }
-
-        function updateDesc() {
-            ["bDesc", "wDesc"].forEach((id, i) => {
-                const p = i === 0 ? B : W;
-                const s = data[p].skill;
-                if (!s) { $(id).textContent = "未选择技能"; return; }
-                const info = SKILL[s];
-                $(id).innerHTML = `${info.name}：${info.desc}<br>限制：${info.limit}`;
-            });
-        }
-
-        function refreshBtn() {
-            document.querySelectorAll(".btn.skill").forEach(b => b.style.display = "none");
-            let p = cur;
-            if (mode === "online") {
-                const me = isHost ? B : W;
-                if (cur !== me) return;
-                p = me;
-            } else if (mode === "ai" && cur === W) return;
-            const s = data[p].skill;
-            if (s && BTN[s]) $(BTN[s]).style.display = "block";
-        }
-
-        // 落子入口
-        function onClick(x, y) {
-            if (over || phase === "skillSelect" || phase === "modeSelect") return;
-            if (mode === "online" && cur !== (isHost ? B : W)) return;
-            if (mode === "ai" && cur === W) return;
-            switch (phase) {
-                case "normal": drop(x, y); break;
-                case "placingBlast": placeBomb(x, y); break;
-                case "selectingCopySource": selectCopySrc(x, y); break;
-                case "selectingCopyTarget": selectCopyTar(x, y); break;
-                case "sedimentBurst": sedDrop(x, y); break;
-            }
-        }
-
-        function drop(x, y) {
-            if (board[y][x] !== EMP) return;
-            board[y][x] = cur;
-            render();
-            if (myTurn() && mode !== "local") sendMove(x, y);
-            if (checkWin(x, y, cur)) return endGame(cur);
-
-            if (extra && !extraUsed) {
-                extraUsed = true;
-                setStatus("额外落子机会，请再落一子");
-                return;
-            }
-
-            if (data[cur].skill === "sediment" && data[cur].sed > 0) {
-                data[cur].drop = data[cur].sed;
-                phase = "sedimentBurst";
-                setStatus(`沉淀爆发！还需放置 ${data[cur].drop} 颗棋子`);
-                statusEl.classList.add("glow");
-                updateUI();
-                // AI沉淀爆发自动续下
-                if (mode === "ai" && cur === W) setTimeout(aiMove, 500);
-                return;
-            }
-            endTurn();
-        }
-
-        const myTurn = () => mode !== "online" || cur === (isHost ? B : W);
-
-        function sedDrop(x, y) {
-            if (board[y][x] !== EMP) return;
-            board[y][x] = cur;
-            render();
-            if (myTurn() && mode !== "local") sendMove(x, y);
-            if (checkWin(x, y, cur)) return endGame(cur);
-            data[cur].drop--;
-            if (data[cur].drop > 0) {
-                setStatus(`沉淀爆发！还需放置 ${data[cur].drop} 颗棋子`);
-                // AI继续落子
-                if (mode === "ai" && cur === W) setTimeout(aiMove, 500);
-            } else {
-                data[cur].sed = 0;
-                phase = "normal";
-                statusEl.classList.remove("glow");
-                endTurn();
-            }
-            updateUI();
-        }
-
-        function placeBomb(x, y) {
-            if (board[y][x] !== EMP) return setStatus("只能在空位放置标记");
-            if (bombs.some(m => m.x === x && m.y === y)) return setStatus("该位置已有标记");
-            bombs.push({ x, y, owner: cur, left: 2 });
-            data[cur].cnt--; phase = "normal";
-            if (myTurn() && mode !== "local") sendSkill("blast", {x, y});
-            setStatus("爆破标记已放置，2回合后爆炸");
-            render(); updateUI(); endTurn();
-        }
-
-        function selectCopySrc(x, y) {
-            if (board[y][x] !== cur) return setStatus("请选择己方棋子");
-            const dirs = [[1,0],[0,1],[1,1],[1,-1]];
-            let max = [{x,y}], maxDir = [1,0];
-            for (const [dx, dy] of dirs) {
-                const line = [{x,y}];
-                let nx = x+dx, ny = y+dy;
-                while (nx>=0&&nx<S&&ny>=0&&ny<S&&board[ny][nx]===cur&&line.length<3) {
-                    line.push({x:nx,y:ny}); nx+=dx; ny+=dy;
-                }
-                nx = x-dx; ny = y-dy;
-                while (nx>=0&&nx<S&&ny>=0&&ny<S&&board[ny][nx]===cur&&line.length<3) {
-                    line.unshift({x:nx,y:ny}); nx-=dx; ny-=dy;
-                }
-                if (line.length > max.length) { max = line; maxDir = [dx, dy]; }
-            }
-            copySrc = max; copyDir = maxDir;
-            phase = "selectingCopyTarget";
-            render(); setStatus(`已选中${max.length}颗棋子，请点击目标空位`);
-        }
-
-        function selectCopyTar(x, y) {
-            const tars = [];
-            const [dx, dy] = copyDir;
-            for (let i = 0; i < copySrc.length; i++) {
-                tars.push({ x: x+i*dx, y: y+i*dy });
-            }
-            for (const t of tars) {
-                if (t.x<0||t.x>=S||t.y<0||t.y>=S) return setStatus("目标超出棋盘");
-                if (board[t.y][t.x] !== EMP || bombs.some(m => m.x===t.x&&m.y===t.y)) return setStatus("目标位置必须为空");
-            }
-            let gap = true;
-            for (const s of copySrc) {
-                for (const t of tars) {
-                    if (Math.abs(s.x-t.x)<=1 && Math.abs(s.y-t.y)<=1) { gap = false; break; }
-                }
-                if (!gap) break;
-            }
-            if (!gap) return setStatus("必须与原棋组至少间隔1格");
-
-            tars.forEach(t => board[t.y][t.x] = cur);
-            render();
-            // 复制特效
-            addFx(tars, "copy", 400);
-
-            for (const t of tars) {
-                if (checkWin(t.x, t.y, cur)) return endGame(cur);
-            }
-
-            data[cur].cnt--; copySrc = []; copyDir = null;
-            phase = "normal"; setStatus("复制成功");
-            updateUI(); endTurn();
-        }
-
-        // 引雷技能
-        function castThunder() {
-            const pieces = [];
-            for (let y = 0; y < S; y++) {
-                for (let x = 0; x < S; x++) {
-                    if (board[y][x] !== EMP) pieces.push({x, y, color: board[y][x]});
-                }
-            }
-            if (pieces.length < 5) return setStatus("场上棋子太少，无法引雷");
-
-            // 随机10-15道雷，洗牌去重
-            const count = Math.min(pieces.length, Math.floor(Math.random()*6) + 10);
-            for (let i = pieces.length-1; i > 0; i--) {
-                const j = Math.floor(Math.random()*(i+1));
-                [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
-            }
-            const targets = pieces.slice(0, count);
-
-            if (myTurn() && mode !== "local") sendSkill("thunder", { targets });
-            execThunder(targets, true);
-        }
-
-        function execThunder(targets, isCaster) {
-            let hit = 0;
-            targets.forEach(t => {
-                const isMine = t.color === cur;
-                if (!(isMine && Math.random() < 0.5)) { // 我方50%免疫
-                    board[t.y][t.x] = EMP;
-                    hit++;
-                }
-            });
-
-            render();
-            // 落雷特效（所有命中点均播放）
-            addFx(targets, "thunder", 600);
-
-            if (isCaster) {
-                data[cur].cnt--;
-                setStatus(`引雷发动！${hit}颗棋子被击毁`);
-                updateUI();
-                setTimeout(endTurn, 400); // 延迟结算，保证特效可见
-            }
-        }
-
-        // 统一特效工具
-        function addFx(positions, fxClass, duration) {
-            positions.forEach(p => {
-                const cell = boardEl.children[p.y*S + p.x];
-                cell.classList.add(fxClass);
-                setTimeout(() => cell.classList.remove(fxClass), duration);
-            });
-        }
-
-        // 回合结束
-        function endTurn() {
-            // 爆破倒计时
-            bombs.forEach(m => { if (m.owner !== cur) m.left--; });
-            const exp = bombs.filter(m => m.left <= 0);
-
-            // 处理爆炸数据
-            exp.forEach(m => {
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        const x = m.x+dx, y = m.y+dy;
-                        if (x>=0&&x<S&&y>=0&&y<S) board[y][x] = EMP;
-                    }
-                }
-                bombs = bombs.filter(b => !(b.x===m.x&&b.y===m.y));
-            });
-
-            render();
-            // 爆破特效
-            exp.forEach(m => {
-                const area = [];
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        const x = m.x+dx, y = m.y+dy;
-                        if (x>=0&&x<S&&y>=0&&y<S) area.push({x, y});
-                    }
-                }
-                addFx(area, "blast", 500);
-            });
-
-            cur = cur === B ? W : B;
-            extra = extraUsed = false;
-            phase = "normal";
-            refreshBtn(); updateUI();
-            setStatus(`当前回合：${cur === B ? "黑方" : "白方"}`);
-            if (mode === "ai" && cur === W && !over) setTimeout(aiMove, 800);
-        }
-
-        function checkWin(x, y, p) {
-            const dirs = [[1,0],[0,1],[1,1],[1,-1]];
-            for (const [dx, dy] of dirs) {
-                let c = 1, nx = x+dx, ny = y+dy;
-                while (nx>=0&&nx<S&&ny>=0&&ny<S&&board[ny][nx]===p) { c++; nx+=dx; ny+=dy; }
-                nx = x-dx; ny = y-dy;
-                while (nx>=0&&nx<S&&ny>=0&&ny<S&&board[ny][nx]===p) { c++; nx-=dx; ny-=dy; }
-                if (c >= 5) return true;
-            }
-            return false;
-        }
-
-        // AI逻辑
-        function aiMove() {
-            if (over) return;
-            // 沉淀爆发阶段直接落子
-            if (phase === "sedimentBurst") {
-                const moves = [];
-                for (let y = 0; y < S; y++) {
-                    for (let x = 0; x < S; x++) {
-                        if (board[y][x] !== EMP) continue;
-                        const sc = evalPos(x, y, W) + evalPos(x, y, B) * 0.95;
-                        moves.push({x, y, sc});
-                    }
-                }
-                moves.sort((a,b) => b.sc - a.sc);
-                if (moves.length) sedDrop(moves[0].x, moves[0].y);
-                return;
-            }
-
-            if (phase !== "normal") return;
-            const s = data[W].skill;
-            if (s === "blast" && data[W].cnt > 0) {
-                const pos = bestBlast();
-                if (pos) return placeBomb(pos.x, pos.y);
-            }
-            if (s === "thunder" && data[W].cnt > 0 && totalPieces() > 12) {
-                if (Math.random() < 0.4) return castThunder();
-            }
-            if (s === "sediment" && data[W].sed < 2 && totalPieces() > 10) {
-                if (Math.random() < 0.3) {
-                    data[W].sed++;
-                    setStatus("AI选择沉淀蓄力");
-                    updateUI(); return endTurn();
-                }
-            }
-
-            let best = -Infinity, moves = [];
-            for (let y = 0; y < S; y++) {
-                for (let x = 0; x < S; x++) {
-                    if (board[y][x] !== EMP) continue;
-                    const sc = evalPos(x, y, W) + evalPos(x, y, B) * 0.95;
-                    if (sc > best) { best = sc; moves = [{x,y}]; }
-                    else if (sc === best) moves.push({x,y});
-                }
-            }
-            if (moves.length) {
-                const m = moves[Math.floor(Math.random()*moves.length)];
-                drop(m.x, m.y);
-            }
-        }
-
-        function evalPos(x, y, p) {
-            const dirs = [[1,0],[0,1],[1,1],[1,-1]];
-            let total = 0;
-            for (const [dx, dy] of dirs) {
-                let c = 1, block = 0, nx = x+dx, ny = y+dy;
-                while (nx>=0&&nx<S&&ny>=0&&ny<S) {
-                    if (board[ny][nx] === p) c++;
-                    else if (board[ny][nx] === EMP) break;
-                    else { block++; break; }
-                    nx+=dx; ny+=dy;
-                }
-                if (nx<0||nx>=S||ny<0||ny>=S) block++;
-                nx = x-dx; ny = y-dy;
-                while (nx>=0&&nx<S&&ny>=0&&ny<S) {
-                    if (board[ny][nx] === p) c++;
-                    else if (board[ny][nx] === EMP) break;
-                    else { block++; break; }
-                    nx-=dx; ny-=dy;
-                }
-                if (nx<0||nx>=S||ny<0||ny>=S) block++;
-                if (c>=5) total += 100000;
-                else if (c===4&&block===0) total += 10000;
-                else if (c===4&&block===1) total += 1000;
-                else if (c===3&&block===0) total += 1000;
-                else if (c===3&&block===1) total += 100;
-                else if (c===2&&block===0) total += 100;
-                else if (c===2&&block===1) total += 10;
-            }
-            total += (14 - Math.abs(x-7) - Math.abs(y-7)) * 2;
-            return total;
-        }
-
-        function bestBlast() {
-            let max = 0, best = null;
-            for (let y = 1; y < S-1; y++) {
-                for (let x = 1; x < S-1; x++) {
-                    if (board[y][x] !== EMP) continue;
-                    let c = 0;
-                    for (let dy=-1; dy<=1; dy++)
-                        for (let dx=-1; dx<=1; dx++)
-                            if (board[y+dy][x+dx] === B) c++;
-                    if (c >= 3 && c > max) { max = c; best = {x,y}; }
-                }
-            }
-            return best;
-        }
-
-        // 渲染（保留特效类）
-        function render() {
-            const cells = boardEl.children;
-            for (let i = 0; i < cells.length; i++) {
-                const x = i % S, y = Math.floor(i / S);
-                const c = cells[i];
-                // 保留特效类
-                const fxC = FX.filter(f => c.classList.contains(f));
-                c.className = "cell " + fxC.join(" ");
-                c.textContent = "";
-                // 基础状态
-                if (board[y][x] === B) c.classList.add("black");
-                else if (board[y][x] === W) c.classList.add("white");
-                const m = bombs.find(b => b.x===x && b.y===y);
-                if (m) { c.classList.add("bomb"); c.textContent = m.left; }
-                if (copySrc.some(p => p.x===x && p.y===y)) c.classList.add("sel");
-            }
-        }
-
-        function updateUI() {
-            $("bCnt").textContent = data[B].skill === "sediment" ? "无限制" : data[B].cnt;
-            $("wCnt").textContent = data[W].skill === "sediment" ? "无限制" : data[W].cnt;
-            $("bStat").classList.toggle("active", cur === B);
-            $("wStat").classList.toggle("active", cur === W);
-
-            const s = data[cur].skill;
-            if (s && BTN[s]) {
-                const btn = $(BTN[s]);
-                btn.disabled = s === "sediment"
-                    ? data[cur].sed >= 3 || phase !== "normal"
-                    : data[cur].cnt <= 0 || phase !== "normal";
-            }
-        }
-
-        function setStatus(text) {
-            statusEl.textContent = text;
-            statusEl.className = cur === B ? "status-black" : "status-white";
-        }
-
-        function endGame(winner) {
-            over = true;
-            setStatus(`游戏结束！${winner === B ? "黑方" : "白方"}获胜！`);
-            document.querySelectorAll(".btn.skill").forEach(b => b.style.display = "none");
-        }
-
-        const totalPieces = () => board.flat().filter(c => c !== EMP).length;
-        const isEmpty = () => totalPieces() === 0;
-
-        // 技能按钮事件
-        $("btnBlast").onclick = () => {
-            if (data[cur].skill !== "blast" || over || phase !== "normal") return;
-            if (data[cur].cnt <= 0) return;
-            if (cur === B && isEmpty()) return setStatus("首回合禁止使用爆破");
-            phase = "placingBlast";
-            setStatus("请点击空位放置爆破标记");
-        };
-
-        $("btnCopy").onclick = () => {
-            if (data[cur].skill !== "copy" || over || phase !== "normal") return;
-            if (data[cur].cnt <= 0) return;
-            const t = totalPieces();
-            if ((cur===B&&t<=4) || (cur===W&&t<=3)) return setStatus("开局阶段禁止使用复制");
-            phase = "selectingCopySource";
-            copySrc = [];
-            setStatus("请点击己方棋子选择要复制的棋组");
-        };
-
-        $("btnSed").onclick = () => {
-            if (data[cur].skill !== "sediment" || over || phase !== "normal") return;
-            if (data[cur].sed >= 3) return setStatus("沉淀层数已达上限");
-            if (cur === B && isEmpty()) return setStatus("首回合禁止使用沉淀");
-            data[cur].sed++;
-            if (mode === "online" && myTurn()) sendSkill("sediment", {});
-            setStatus(`放弃本回合，沉淀层数增加至 ${data[cur].sed} 层`);
-            statusEl.classList.add("glow");
-            setTimeout(() => statusEl.classList.remove("glow"), 800);
-            updateUI(); endTurn();
-        };
-
-        $("btnThunder").onclick = () => {
-            if (data[cur].skill !== "thunder" || over || phase !== "normal") return;
-            if (data[cur].cnt <= 0) return;
-            if (totalPieces() < 5) return setStatus("场上棋子太少，无法引雷");
-            castThunder();
-        };
-
-        // 赌徒技能
-        $("btnRps").onclick = () => {
-            if (data[cur].skill !== "gambler" || over || phase !== "normal") return;
-            if (data[cur].cnt <= 0) return;
-            const t = totalPieces();
-            if ((cur===B&&t<2) || (cur===W&&t<1)) return setStatus("开局阶段禁止使用赌徒");
-            rps = { active: true, from: cur, a: null, b: null, draw: 0 };
-            $("rpsModal").classList.add("show");
-            $("rpsTip").textContent = "请选择出拳";
-        };
-
-        document.querySelectorAll(".rps-btn").forEach(btn => {
-            btn.onclick = () => {
-                const c = btn.dataset.choice;
-                if (!rps.a) {
-                    rps.a = c;
-                    if (mode === "ai" && rps.from === B) {
-                        const opts = ["rock", "scissors", "paper"];
-                        rps.b = opts[Math.floor(Math.random()*3)];
-                        resolveRps();
-                        return;
-                    }
-                    const opp = rps.from === B ? "白方" : "黑方";
-                    $("rpsTip").textContent = `${opp}请选择出拳`;
-                } else {
-                    rps.b = c;
-                    resolveRps();
-                }
-            };
-        });
-
-        function resolveRps() {
-            const { a, b, from } = rps;
-            if (a === b) {
-                rps.draw++;
-                if (rps.draw >= 3) {
-                    $("rpsModal").classList.remove("show");
-                    setStatus("连续3次平局，赌徒技能失效");
-                    rps.active = false;
-                    return;
-                }
-                alert("平局！重新出拳");
-                rps.a = rps.b = null;
-                $("rpsTip").textContent = "平局！请重新选择";
-                return;
-            }
-            const win = { rock: "scissors", scissors: "paper", paper: "rock" };
-            const winFlag = win[a] === b;
-            $("rpsModal").classList.remove("show");
-            rps.active = false;
-            data[from].cnt--;
-
-            if (winFlag) {
-                window.buffPlayer = from;
-                $("buffModal").classList.add("show");
-            } else {
-                debuff(from);
-            }
-            updateUI();
-        }
-
-        $("buffExtra").onclick = () => {
-            extra = true; extraUsed = false;
-            $("buffModal").classList.remove("show");
-            setStatus("赌徒胜利！本回合可额外落1子");
-        };
-
-        $("buffRestore").onclick = () => {
-            const p = window.buffPlayer;
-            const s = data[p].skill;
-            const max = s === "blast" ? (p === B ? 3 : 4) : 2;
-            if (data[p].cnt < max) {
-                data[p].cnt++;
-                setStatus(`赌徒胜利！恢复1次${SKILL[s].name}次数`);
-            } else {
-                extra = true;
-                setStatus("技能次数已满，改为额外落1子");
-            }
-            $("buffModal").classList.remove("show");
-            updateUI();
-        };
-
-        function debuff(p) {
-            if (Math.random() < 0.5) {
-                setStatus("赌徒失败！本回合无法落子");
-                setTimeout(() => endTurn(), 1200);
-            } else {
-                if (data[p].cnt > 0) {
-                    data[p].cnt--;
-                    setStatus(`赌徒失败！扣除1次${SKILL[data[p].skill].name}次数`);
-                } else {
-                    setStatus("赌徒失败！本回合无法落子");
-                    setTimeout(() => endTurn(), 1200);
-                }
-            }
-            updateUI();
-        }
-
-        // 取消与返回
-        $("btnCancel").onclick = () => {
-            if (phase === "normal" || phase === "skillSelect" || phase === "modeSelect") return;
-            phase = "normal"; copySrc = [];
-            render();
-            setStatus(`已取消技能，当前回合：${cur === B ? "黑方" : "白方"}`);
-        };
-
-        $("btnBack").onclick = () => {
-            if (peer) { peer.destroy(); peer = null; conn = null; }
-            $("identityTip").style.display = "none";
+function joinMatch(rid) {
+    isHost = false;
+    mode = "online";
+    peer = new Peer();
+    peer.on("open", () => {
+        conn = peer.connect(rid);
+        conn.on("open", () => {
             $("matchTip").classList.remove("show");
-            $("modeModal").classList.add("show");
-            $("createArea").style.display = "none";
-            $("joinArea").style.display = "none";
-            $("joinInput").value = "";
-            phase = "modeSelect"; mode = "local";
-            initBoard();
-            setStatus("请选择游戏模式");
-        };
-    </script>
+            $("modeModal").classList.remove("show");
+            showIdentity();
+            openSkillSelect();
+        });
+        conn.on("error", () => {
+            alert("匹配失败，对手已离开");
+            $("matchTip").classList.remove("show");
+        });
+    });
+    peer.on("error", e => {
+        alert("匹配失败");
+        $("matchTip").classList.remove("show");
+    });
+}
+
+function createRoom() {
+    isHost = true;
+    mode = "online";
+    peer = new Peer();
+    peer.on("open", id => {
+        $("createArea").style.display = "block";
+        $("roomId").textContent = id;
+    });
+    peer.on("connection", c => {
+        conn = c;
+        setupConnection();
+        $("modeModal").classList.remove("show");
+        showIdentity();
+        openSkillSelect();
+    });
+    peer.on("error", e => alert("创建失败：" + e.type));
+}
+
+function setupConnection() {
+    conn.on("data", data => {
+        if (data.type === "move") {
+            if (phase === "normal") dropPiece(data.x, data.y);
+            else sedimentDrop(data.x, data.y);
+        } else if (data.type === "skillSelect") {
+            const opp = isHost ? WHITE : BLACK;
+            playerData[opp].skill = data.payload;
+            setSkillCount(opp, data.payload);
+            updateDesc();
+            updateUI();
+            const me = isHost ? BLACK : WHITE;
+            if (playerData[me].skill && phase === "skillSelect") {
+                $("skillModal").classList.remove("show");
+                phase = "normal";
+                onSkillReady();
+            }
+        } else if (data.type === "skill") {
+            const s = data.payload;
+            if (s.name === "blast") placeBomb(s.x, s.y, false);
+            else if (s.name === "sediment") { playerData[current].sed++; endTurn(); }
+            else if (s.name === "thunder") execThunder(s.hitList, s.allPos, false);
+        } else if (data.type === "domain") {
+            openDomain(data.payload, false);
+        }
+    });
+    conn.on("close", () => {
+        if (!gameOver) {
+            alert("对手断开连接");
+            $("btnBack").click();
+        }
+    });
+}
+
+function sendSync(type, payload) {
+    if (!conn) return;
+    conn.send({ type, payload });
+}
+
+// 赌徒相关
+function resolveRps() {
+    const { a, b, from } = rpsState;
+    if (a === b) {
+        rpsState.draw++;
+        if (rpsState.draw >= 3) {
+            $("rpsModal").classList.remove("show");
+            setStatus("连续3次平局，赌徒技能失效");
+            rpsState.active = false;
+            return;
+        }
+        alert("平局！重新出拳");
+        rpsState.a = rpsState.b = null;
+        $("rpsTip").textContent = "平局！请重新选择";
+        return;
+    }
+    const winMap = { rock: "scissors", scissors: "paper", paper: "rock" };
+    const win = winMap[a] === b;
+    $("rpsModal").classList.remove("show");
+    rpsState.active = false;
+    playerData[from].count--;
+
+    if (win) {
+        window.buffPlayer = from;
+        $("buffModal").classList.add("show");
+    } else {
+        debuff(from);
+    }
+    updateUI();
+}
+
+function debuff(p) {
+    if (Math.random() < 0.5) {
+        setStatus("赌徒失败！本回合无法落子");
+        setTimeout(() => endTurn(), 1200);
+    } else {
+        if (playerData[p].count > 0) {
+            playerData[p].count--;
+            setStatus(`赌徒失败！扣除1次${SKILL_CFG[playerData[p].skill].name}次数`);
+        } else {
+            setStatus("赌徒失败！本回合无法落子");
+            setTimeout(() => endTurn(), 1200);
+        }
+    }
+    updateUI();
+}
+</script>
 </body>
 </html>
