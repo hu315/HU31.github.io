@@ -63,10 +63,8 @@ h1{text-align:center;color:#333;margin-bottom:10px;animation:ti .9s cubic-bezier
 .modal-box h3{margin-bottom:20px}
 .mode-list{display:flex;flex-direction:column;gap:12px;margin-top:20px}
 .btn.mode{display:block;width:100%;background:#3498db;padding:14px;font-size:16px}.btn.mode:hover{background:#2980b9}
-.btn.mode.random{background:#9b59b6}.btn.mode.random:hover{background:#8e44ad}
 .input{width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:6px;font-size:14px}
 .room-id{font-size:18px;font-weight:bold;color:#e67e22;margin:10px 0;letter-spacing:2px;user-select:all}
-.tip{margin-top:15px;color:#666;font-size:14px;display:none}.tip.show{display:block}
 .skill-list{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:20px}
 .skill-card{border:2px solid #ddd;border-radius:8px;padding:15px;cursor:pointer;transition:all .2s;text-align:left}
 .skill-card:hover{border-color:#3498db;background:#f0f8ff}
@@ -111,13 +109,11 @@ h1{text-align:center;color:#333;margin-bottom:10px;animation:ti .9s cubic-bezier
 <div class="mode-list">
 <button class="btn mode" data-mode="local">本地双人对战</button>
 <button class="btn mode" data-mode="ai">人机对战（你执黑）</button>
-<button class="btn mode random" data-mode="random">联机随机匹配</button>
 <button class="btn mode" data-mode="create">创建房间（你执黑）</button>
 <button class="btn mode" data-mode="join">加入房间（你执白）</button>
 </div>
 <div id="createArea" style="display:none;margin-top:15px"><p>你的房间号：</p><div class="room-id" id="roomId">生成中...</div><p>等待对手加入中...</p></div>
 <div id="joinArea" style="display:none;margin-top:15px"><input type="text" class="input" id="joinInput" placeholder="请输入对方房间号"><button class="btn mode" id="joinBtn">加入房间</button></div>
-<div class="tip" id="matchTip">正在匹配对手，请稍候...</div>
 </div></div>
 
 <div id="skillModal" class="modal"><div class="modal-box" style="min-width:520px">
@@ -127,7 +123,7 @@ h1{text-align:center;color:#333;margin-bottom:10px;animation:ti .9s cubic-bezier
 <div class="skill-card" data-skill="copy"><h4>复制</h4><p>手动选最多4颗棋，鼠标预览放置位置</p><p class="num">双方各3次 | 开局禁用</p></div>
 <div class="skill-card" data-skill="sediment"><h4>沉淀</h4><p>放弃回合蓄力，下次落子一次性下多颗</p><p class="num">无限制 | 最多4层 | 首回合禁用</p></div>
 <div class="skill-card" data-skill="thunder"><h4>引雷</h4><p>全棋盘随机落雷，我方40%免疫</p><p class="num">双方各3次 | 开局禁用</p></div>
-<div class="skill-card" data-skill="domain"><h4>绝对领域</h4><p>封禁敌方技能+暂停炸弹，获额外落子</p><p class="num">双方各1次 | 持续4回合</p></div>
+<div class="skill-card" data-skill="domain"><h4>绝对领域</h4><p>封禁敌方技能+暂停炸弹，获1次额外落子</p><p class="num">双方各1次 | 持续8回合</p></div>
 <div class="skill-card" data-skill="gambler"><h4>赌徒</h4><p>猜拳博弈，赢双倍增益输惩罚</p><p class="num">双方各3次 | 开局禁用</p></div>
 </div></div></div>
 
@@ -152,11 +148,11 @@ const CFG = {
     copy:{n:"复制",d:"手动选最多4颗棋，需间隔1格",l:"开局前3手禁用"},
     sediment:{n:"沉淀",d:"蓄力后一次落多子，最多4层",l:"首回合禁用"},
     thunder:{n:"引雷",d:"全棋盘落雷，我方40%免疫",l:"开局前3手禁用"},
-    domain:{n:"绝对领域",d:"封敌技能+停炸弹，获额外落子",l:"1次，持续4回合"},
+    domain:{n:"绝对领域",d:"封敌技能+停炸弹，获1次额外落子",l:"1次，持续8回合"},
     gambler:{n:"赌徒",d:"猜拳赢双倍增益输惩罚",l:"开局前2手禁用"}
 };
 const BTN={blast:"btnBlast",copy:"btnCopy",sediment:"btnSed",thunder:"btnThunder",domain:"btnDomain",gambler:"btnRps"};
-const FX=["blast","thunder","copy"], MQ="gomoku-skill-match-queue";
+const FX=["blast","thunder","copy"];
 
 let mode="local",host=0,peer=null,conn=null,board=[],cur=B,over=0,phase="modeSelect";
 let cs=[],co=[],bombs=[],extra=0,dom={a:0,o:null,l:0},rps={a:0,f:null,x:null,y:null,d:0};
@@ -180,7 +176,6 @@ function bindMouse(){
 document.querySelectorAll(".btn.mode[data-mode]").forEach(b=>{
     b.onclick=()=>{
         const m=b.dataset.mode;
-        if(m==="random")return match();
         mode=m;
         if(m==="local"||m==="ai"){$("modeModal").classList.remove("show");showId();selSkill()}
         else if(m==="create"){if(typeof Peer==="undefined")return alert("联机组件加载失败");createRoom()}
@@ -218,7 +213,7 @@ document.querySelectorAll(".rps-btn").forEach(b=>{
     }
 });
 
-// 修复复制按钮二次点击逻辑
+// 复制按钮逻辑修复
 $("btnCopy").onclick=()=>{
     if(phase==="selectingCopySource"){
         if(cs.length===0)return setStatus("请至少选择1颗棋子");
@@ -240,8 +235,9 @@ $("btnSed").onclick=()=>{
     if(cantUse("sediment"))return;
     if(D[cur].se>=4)return setStatus("沉淀层数已达上限");
     if(cur===B&&!total())return setStatus("首回合禁止使用沉淀");
-    D[cur].se++;if(myTurn()&&mode!=="local")send("skill","sediment");
-    setStatus(`放弃本回合，沉淀层数增加至 ${D[cur].se} 层`);
+    D[cur].se++;
+    if(myTurn()&&mode!=="local")send("skill","sediment");
+    setStatus(`已选择沉淀蓄力，当前层数：${D[cur].se} / 4 层`);
     st.classList.add("glow");setTimeout(()=>st.classList.remove("glow"),800);
     upUI();endTurn()
 };
@@ -260,7 +256,7 @@ $("btnCancel").onclick=()=>{
 };
 $("btnBack").onclick=()=>{
     if(peer){peer.destroy();peer=null;conn=null}
-    $("itip").style.display="none";$("matchTip").classList.remove("show");
+    $("itip").style.display="none";
     $("modeModal").classList.add("show");$("createArea").style.display="none";
     $("joinArea").style.display="none";$("joinInput").value="";
     phase="modeSelect";mode="local";init();setStatus("请选择游戏模式")
@@ -390,7 +386,7 @@ function castT(){
 }
 function execT(hit,all,isC){hit.forEach(p=>board[p.y][p.x]=EMP);render();addFx(all,"thunder",700);if(isC){D[cur].c--;setStatus(`引雷发动！${hit.length}颗棋子被击毁`);upUI();setTimeout(endTurn,400)}}
 function castD(){if(dom.a)return setStatus("领域已开启");if(myTurn()&&mode!=="local")send("domain",cur);openD(cur,1)}
-function openD(o,isC){dom={a:1,o,l:4};be.classList.add("domain");if(isC){D[cur].c--;extra+=2;setStatus("绝对领域开启！敌方技能已封禁，获得2次额外落子");upUI()}}
+function openD(o,isC){dom={a:1,o,l:8};be.classList.add("domain");if(isC){D[cur].c--;extra+=1;setStatus("绝对领域开启！敌方技能已封禁，获得1次额外落子");upUI()}}
 function closeD(){dom.a=0;be.classList.remove("domain");setStatus("绝对领域消散");refBtn()}
 function addFx(ps,fc,dur){ps.forEach(p=>{const c=be.children[p.y*S+p.x];c.classList.add(fc);setTimeout(()=>c.classList.remove(fc),dur)})}
 
@@ -491,8 +487,9 @@ function render(){
     }
 }
 function upUI(){
-    $("bc").textContent=D[B].s==="sediment"?"无限制":D[B].c;
-    $("wc").textContent=D[W].s==="sediment"?"无限制":D[W].c;
+    // 沉淀显示层数，其他显示次数
+    $("bc").textContent = D[B].s === "sediment" ? `${D[B].se} / 4 层` : D[B].c;
+    $("wc").textContent = D[W].s === "sediment" ? `${D[W].se} / 4 层` : D[W].c;
     $("bs").classList.toggle("active",cur===B);
     $("ws").classList.toggle("active",cur===W);
     const s=D[cur].s;
@@ -502,20 +499,6 @@ function setStatus(t){st.textContent=t;st.className=cur===B?"status-black":"stat
 function endGame(w){over=1;closeD();clearPrev();setStatus(`游戏结束！${w===B?"黑方":"白方"}获胜！`);document.querySelectorAll(".btn.skill").forEach(b=>b.style.display="none")}
 const total=()=>board.flat().filter(c=>c!==EMP).length;
 
-async function match(){
-    if(typeof Peer==="undefined")return alert("联机组件加载失败");
-    $("matchTip").classList.add("show");
-    try{
-        const res=await fetch(`https://api.countapi.xyz/hit/${MQ}/queue`);
-        const num=(await res.json()).value,rid=`match-${Math.floor((num+1)/2)}`;
-        if(num%2){host=1;mode="online";peer=new Peer(rid);
-            peer.on("open",()=>{$("roomId").textContent=rid;$("createArea").style.display="block"});
-            peer.on("connection",c=>{conn=c;setup();$("matchTip").classList.remove("show");$("modeModal").classList.remove("show");showId();selSkill()});
-            peer.on("error",e=>{if(e.type==="unavailable-id")joinM(rid);else{alert("匹配失败");$("matchTip").classList.remove("show")}})
-        }else joinM(rid)
-    }catch{alert("匹配服务异常，请稍后重试");$("matchTip").classList.remove("show")}
-}
-function joinM(rid){host=0;mode="online";peer=new Peer();peer.on("open",()=>{conn=peer.connect(rid);conn.on("open",()=>{$("matchTip").classList.remove("show");$("modeModal").classList.remove("show");showId();selSkill()});conn.on("error",()=>{alert("匹配失败，对手已离开");$("matchTip").classList.remove("show")})});peer.on("error",e=>{alert("匹配失败");$("matchTip").classList.remove("show")})}
 function createRoom(){host=1;mode="online";peer=new Peer();peer.on("open",id=>{$("createArea").style.display="block";$("roomId").textContent=id});peer.on("connection",c=>{conn=c;setup();$("modeModal").classList.remove("show");showId();selSkill()});peer.on("error",e=>alert("创建失败："+e.type))}
 function setup(){
     conn.on("data",d=>{
