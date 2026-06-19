@@ -175,7 +175,7 @@ function bindAllEvents(){
         if(cantUse("cannon")) return setStatus("当前无法使用天上来敌");
         if(total() < 4) return setStatus("开局前4手禁止召唤炮");
         window.phase = "placingCannon";
-        setStatus("【天上来敌】点击空位放置炮");
+        setStatus("【天上来敌】点击空位放置炮（下回合可攻击）");
     };
     $("btnSitKill").onclick = ()=>{
         if(window.phase === "selectingSitKill"){
@@ -232,6 +232,14 @@ function bindAllEvents(){
         if(window.phase === "gamblerDrop"){
             window.extra = 0;
             endTurn();
+            return;
+        }
+        if(window.phase === "cannonAttack"){
+            clearAttackTargets();
+            window.selectedCannon = null;
+            window.phase = "normal";
+            render();
+            updateStatusText();
             return;
         }
         if(window.phase === "normal" || window.phase === "skillSelect") return;
@@ -457,15 +465,22 @@ function click(x, y){
     }
     if(window.mode === "ai" && window.cur === W) return;
 
-    // 炮攻击模式
-    if(window.phase === "normal" && window.D[window.cur].s === "cannon"){
+    // 炮攻击模式：支持切换选中炮
+    if(window.D[window.cur].s === "cannon"){
         const v = window.board[y][x];
         if(isOwn(v, window.cur) && (v===B_CANNON || v===W_CANNON)){
             if(window.dom.a && window.dom.o !== window.cur) return setStatus("敌方领域内，炮无法攻击");
+            // 检查是否有可攻击目标
+            const targets = getAttackTargets(x, y, window.cur);
+            if(targets.length === 0){
+                setStatus("该炮没有可攻击的目标（需隔1子打敌方棋子）");
+                return;
+            }
+            clearAttackTargets();
             window.selectedCannon = {x, y};
             window.phase = "cannonAttack";
             showAttackTargets(x, y, window.cur);
-            setStatus("已选中炮，点击红色目标发动攻击");
+            setStatus("已选中炮，点击红色目标发动攻击，点空白取消");
             return;
         }
     }
@@ -474,6 +489,7 @@ function click(x, y){
             cannonAttack(window.selectedCannon.x, window.selectedCannon.y, x, y);
             return;
         }
+        // 点空白或非目标取消选中
         clearAttackTargets();
         window.selectedCannon = null;
         window.phase = "normal";
@@ -494,7 +510,26 @@ function click(x, y){
     }
 }
 
-// 炮相关
+// ========== 炮相关逻辑（全修复） ==========
+// 获取所有可攻击目标
+function getAttackTargets(x0, y0, pl){
+    const targets = [];
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    dirs.forEach(([dx,dy])=>{
+        let x = x0+dx, y = y0+dy, found = false;
+        while(x>=0 && x<S && y>=0 && y<S){
+            if(window.board[y][x] !== EMP){
+                if(!found) found = true;
+                else {
+                    if(isEnemy(window.board[y][x], pl)) targets.push({x, y});
+                    break;
+                }
+            }
+            x += dx; y += dy;
+        }
+    });
+    return targets;
+}
 function canAttack(x0, y0, xt, yt, pl){
     if(x0!==xt && y0!==yt || x0===xt && y0===yt) return false;
     let count = 0;
@@ -510,20 +545,8 @@ function canAttack(x0, y0, xt, yt, pl){
     return count === 1;
 }
 function showAttackTargets(x0, y0, pl){
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    dirs.forEach(([dx,dy])=>{
-        let x = x0+dx, y = y0+dy, found = false;
-        while(x>=0 && x<S && y>=0 && y<S){
-            if(window.board[y][x] !== EMP){
-                if(!found) found = true;
-                else {
-                    if(isEnemy(window.board[y][x], pl)) window.be.children[y*S+x].classList.add("attack-target");
-                    break;
-                }
-            }
-            x += dx; y += dy;
-        }
-    });
+    const targets = getAttackTargets(x0, y0, pl);
+    targets.forEach(t => window.be.children[t.y*S+t.x].classList.add("attack-target"));
 }
 function clearAttackTargets(){
     document.querySelectorAll(".attack-target").forEach(c => c.classList.remove("attack-target"));
@@ -540,9 +563,18 @@ function cannonAttack(x0, y0, xt, yt){
     addFx([{x:xt, y:yt}], "blast", 500);
     setStatus("炮攻击成功");
     
+    // 修复：炮攻击后检测胜利
+    if(checkWin(xt, yt, window.cur)){
+        if(myTurn() && window.mode!=="local"){
+            send("skill", {name:"cannonAttack", x0, y0, xt, yt, win: true});
+        }
+        endGame(window.cur);
+        return;
+    }
+    
     // 联机同步
     if(myTurn() && window.mode!=="local"){
-        send("skill", {name:"cannonAttack", x0, y0, xt, yt});
+        send("skill", {name:"cannonAttack", x0, y0, xt, yt, win: false});
     }
     setTimeout(endTurn, 600);
 }
@@ -593,10 +625,23 @@ function execSitKill(){
     addFx(allRemoved, "blast", 500);
     setStatus(`坐杀发动，双方各移除 ${count} 颗`);
     
+    // 胜利检测
+    let win = false;
+    for(let y=0; y<S; y++){
+        for(let x=0; x<S; x++){
+            if(isOwn(window.board[y][x], window.cur) && checkWin(x, y, window.cur)){
+                win = true; break;
+            }
+        }
+        if(win) break;
+    }
+    
     // 联机同步
     if(myTurn() && window.mode!=="local"){
-        send("skill", {name:"sitKill", removed: allRemoved});
+        send("skill", {name:"sitKill", removed: allRemoved, win});
     }
+    
+    if(win) return endGame(window.cur);
     upUI();
     setTimeout(endTurn, 600);
 }
@@ -649,7 +694,6 @@ function placeCopy(x, y){
     for(const t of ts){
         if(checkWin(t.x, t.y, window.cur)){ win = true; break; }
     }
-    if(win) return endGame(window.cur);
     
     window.D[window.cur].c--;
     window.cs = []; window.co = [];
@@ -658,8 +702,10 @@ function placeCopy(x, y){
     
     // 联机同步
     if(myTurn() && window.mode!=="local"){
-        send("skill", {name:"copy", targets: ts});
+        send("skill", {name:"copy", targets: ts, win});
     }
+    
+    if(win) return endGame(window.cur);
     upUI();
     endTurn();
 }
@@ -671,7 +717,7 @@ function drop(x, y){
     render();
     
     if(checkWin(x, y, window.cur)){
-        if(myTurn() && window.mode!=="local") send("move", {x, y, endTurn: false});
+        if(myTurn() && window.mode!=="local") send("move", {x, y, endTurn: false, win: true});
         return endGame(window.cur);
     }
     
@@ -691,7 +737,7 @@ function drop(x, y){
     
     // 同步落子+回合标记
     if(myTurn() && window.mode!=="local"){
-        send("move", {x, y, endTurn: willEndTurn});
+        send("move", {x, y, endTurn: willEndTurn, win: false});
     }
     
     if(willEndTurn) {
@@ -710,7 +756,7 @@ function sedDrop(x, y){
     render();
     
     if(checkWin(x, y, window.cur)){
-        if(myTurn() && window.mode!=="local") send("move", {x, y, endTurn: false});
+        if(myTurn() && window.mode!=="local") send("move", {x, y, endTurn: false, win: true});
         return endGame(window.cur);
     }
     
@@ -726,7 +772,7 @@ function sedDrop(x, y){
     }
     
     if(myTurn() && window.mode!=="local"){
-        send("move", {x, y, endTurn: willEndTurn});
+        send("move", {x, y, endTurn: willEndTurn, win: false});
     }
     
     if(willEndTurn) {
@@ -746,7 +792,7 @@ function gamblerDrop(x, y){
     render();
     
     if(checkWin(x, y, window.cur)){
-        if(myTurn() && window.mode!=="local") send("move", {x, y, endTurn: false});
+        if(myTurn() && window.mode!=="local") send("move", {x, y, endTurn: false, win: true});
         return endGame(window.cur);
     }
     
@@ -759,7 +805,7 @@ function gamblerDrop(x, y){
     }
     
     if(myTurn() && window.mode!=="local"){
-        send("move", {x, y, endTurn: willEndTurn});
+        send("move", {x, y, endTurn: willEndTurn, win: false});
     }
     
     if(willEndTurn) {
@@ -802,10 +848,33 @@ function castT(){
         if(c === EMP) return;
         if(!(isOwn(c, window.cur) && Math.random() < 0.4)) hit.push(p);
     });
-    if(myTurn() && window.mode!=="local") send("skill", {name:"thunder", hit, all});
-    execT(hit, all, 1);
+    
+    // 胜利检测
+    let win = false;
+    hit.forEach(p => {
+        window.board[p.y][p.x] = EMP;
+    });
+    for(let y=0; y<S; y++){
+        for(let x=0; x<S; x++){
+            if(isOwn(window.board[y][x], window.cur) && checkWin(x, y, window.cur)){
+                win = true; break;
+            }
+        }
+        if(win) break;
+    }
+    // 恢复棋盘，等execT统一处理
+    hit.forEach(p => {
+        window.board[p.y][p.x] = window.cur === B ? W : B;
+    });
+    // 重新赋值为原值
+    hit.forEach(p => {
+        window.board[p.y][p.x] = EMP;
+    });
+    
+    if(myTurn() && window.mode!=="local") send("skill", {name:"thunder", hit, all, win});
+    execT(hit, all, 1, win);
 }
-function execT(hit, all, isC){
+function execT(hit, all, isC, win = false){
     hit.forEach(p => window.board[p.y][p.x] = EMP);
     window.bombs = window.bombs.filter(b => !hit.some(h => h.x===b.x && h.y===b.y));
     render();
@@ -814,6 +883,7 @@ function execT(hit, all, isC){
         window.D[window.cur].c--;
         setStatus(`引雷完成，击毁 ${hit.length} 颗棋子`);
         upUI();
+        if(win) return endGame(window.cur);
         setTimeout(endTurn, 400);
     }
 }
@@ -1031,6 +1101,21 @@ function autoPlay(pl){
                     return;
                 }
             }
+            // AI使用炮
+            if(mainSkill === "cannon" && window.D[pl].c > 0 && total() > 6){
+                if(Math.random() < 0.3){
+                    // 找空位放炮
+                    const empties = [];
+                    for(let y=3; y<S-3; y++) for(let x=3; x<S-3; x++){
+                        if(window.board[y][x] === EMP) empties.push({x,y});
+                    }
+                    if(empties.length){
+                        const pos = empties[Math.floor(Math.random()*empties.length)];
+                        placeCannon(pos.x, pos.y);
+                        return;
+                    }
+                }
+            }
         }
     }
 
@@ -1242,7 +1327,7 @@ function backToMenu(){
     setStatus("请选择游戏模式");
 }
 
-// ========== 联机功能 ==========
+// ========== 联机功能（全同步修复） ==========
 function createRoom(){
     window.host = 1;
     window.mode = "online";
@@ -1267,7 +1352,7 @@ function setup(){
             window.board[d.payload.y][d.payload.x] = window.cur;
             render();
             // 胜利检测
-            if(checkWin(d.payload.x, d.payload.y, window.cur)){
+            if(d.payload.win || checkWin(d.payload.x, d.payload.y, window.cur)){
                 endGame(window.cur);
                 return;
             }
@@ -1286,7 +1371,10 @@ function setup(){
         } else if(d.type === "skill"){
             const s = d.payload;
             if(s.name === "blast"){
+                // 修复：同步扣减对方技能次数
+                window.D[window.cur].c--;
                 placeB(s.x, s.y, 0);
+                upUI();
                 endTurn();
             } else if(s.name === "cannon"){
                 window.board[s.y][s.x] = window.cur === B ? B_CANNON : W_CANNON;
@@ -1296,28 +1384,31 @@ function setup(){
                 endTurn();
             } else if(s.name === "sediment"){
                 window.D[window.cur].se++;
+                upUI();
                 endTurn();
             } else if(s.name === "thunder"){
+                window.D[window.cur].c--;
                 execT(s.hit, s.all, 0);
-                endTurn();
+                upUI();
+                if(s.win) return endGame(window.cur);
+                setTimeout(endTurn, 400);
             } else if(s.name === "copy"){
+                window.D[window.cur].c--;
                 s.targets.forEach(t => window.board[t.y][t.x] = window.cur);
                 render();
                 addFx(s.targets, "copy", 500);
-                // 胜利检测
-                for(const t of s.targets){
-                    if(checkWin(t.x, t.y, window.cur)){
-                        endGame(window.cur);
-                        return;
-                    }
-                }
+                upUI();
+                if(s.win) return endGame(window.cur);
                 endTurn();
             } else if(s.name === "sitKill"){
+                window.D[window.cur].c--;
                 s.removed.forEach(p => window.board[p.y][p.x] = EMP);
                 window.bombs = window.bombs.filter(b => !s.removed.some(h => h.x===b.x && h.y===b.y));
                 render();
                 addFx(s.removed, "blast", 500);
-                endTurn();
+                upUI();
+                if(s.win) return endGame(window.cur);
+                setTimeout(endTurn, 600);
             } else if(s.name === "cannonAttack"){
                 const type = window.cur===B ? B_CANNON : W_CANNON;
                 window.board[s.yt][s.xt] = EMP;
@@ -1325,11 +1416,13 @@ function setup(){
                 window.board[s.yt][s.xt] = type;
                 render();
                 addFx([{x:s.xt, y:s.yt}], "blast", 500);
-                endTurn();
+                if(s.win) return endGame(window.cur);
+                setTimeout(endTurn, 600);
             }
         } else if(d.type === "domain"){
-            // 修复：对方开领域不提前结束回合，对方会自己落子同步
+            window.D[window.cur].c--;
             openD(d.payload, 0);
+            upUI();
         }
     });
     window.conn.on("close", () => {
