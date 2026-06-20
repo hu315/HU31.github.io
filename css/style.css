@@ -715,3 +715,35 @@ h1 {
     box-sizing: border-box;
 }
 #editUserModal .btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+/* 棋盘在小屏幕下更紧凑 */
+@media (max-width: 600px) {
+    .board { max-width: 100%; }
+    .skills { min-width: auto; padding: 10px; }
+    .player-stats { flex-direction: column; gap: 5px; }
+    .stat { padding: 6px 10px; }
+    .stat h3 { font-size: 14px; }
+    .skill-desc { font-size: 10px; }
+    .btn { font-size: 12px; padding: 8px; }
+    .modal-box { min-width: auto; width: 95%; padding: 15px; }
+    .skill-list { grid-template-columns: 1fr; }
+    .difficulty-grid { grid-template-columns: repeat(3, 1fr); }
+    .reward-grid { grid-template-columns: 1fr 1fr; }
+    .wheel-wrap { width: 220px; height: 220px; }
+    .wheel-text { font-size: 10px; width: 80px; }
+    .container { margin-left: 0; padding: 0 10px; }
+}
+
+/* 好友面板在手机端完全折叠为小图标 */
+@media (max-width: 480px) {
+    .friend-panel { width: 50px; }
+    .friend-panel .friend-header span,
+    .friend-panel .friend-item .name,
+    .friend-panel .friend-item .id,
+    .friend-panel .user-info span,
+    .friend-panel .btn-add span { display: none; }
+    .friend-panel .friend-header { justify-content: center; padding: 10px 0; }
+    .friend-panel .friend-item { padding: 6px 0; justify-content: center; }
+    .friend-panel .user-info { flex-direction: column; align-items: center; font-size: 10px; }
+    .chat-window { width: 100%; right: 0; bottom: 0; height: 70vh; border-radius: 0; }
+    .conn-status { font-size: 10px; padding: 4px 8px; }
+}

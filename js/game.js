@@ -1,4 +1,5 @@
 // ==================== 全局 ====================
+window.initPeerConnection = initPeerConnection;
 window.mode = "local";
 window.host = 0;
 window.conn = null;
