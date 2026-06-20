@@ -75,12 +75,14 @@ const Account = {
         return JSON.parse(localStorage.getItem(key) || "[]");
     },
 
+    // ★★★ 修改点：添加好友后立即刷新列表 ★★★
     _addFriendDirect(userId, remark) {
         const friends = this.getFriends();
         if (friends.find(f => f.userId === userId)) return false;
         friends.push({ userId, remark: remark || `玩家${userId}` });
         const key = `friends_${this.currentUser.userId}`;
         localStorage.setItem(key, JSON.stringify(friends));
+        this.renderFriendList();  // <-- 新增，确保好友列表及时更新
         return true;
     },
 
@@ -226,7 +228,6 @@ const Account = {
 
     // ===== 底层数据发送（使用消息专用 peer） =====
     sendDataToUser(targetUserId, data, callback) {
-        // 确保消息 peer 存在
         if (!window.peer || window.peer.destroyed) {
             window.peer = new Peer(Account.currentUser.userId, {
                 host: '0.peerjs.com',
@@ -264,14 +265,12 @@ const Account = {
             connected = true;
             clearTimeout(timeout);
             conn.send(data);
-            // 监听回复（只处理一次）
             conn.on("data", (reply) => {
                 if (reply.type === "friendRequestReply") {
                     Account.handleFriendRequestReply(reply);
                 } else if (reply.type === "inviteReply") {
                     Account.handleInviteReply(reply);
                 }
-                // 收到回复后关闭连接
                 setTimeout(() => { if (conn.open) conn.close(); }, 300);
             });
             if (callback) callback(true);
@@ -314,7 +313,7 @@ const Account = {
         }
     },
 
-    // ===== 处理对战邀请回复（修复：销毁游戏 peer，保留消息 peer） =====
+    // ===== 处理对战邀请回复 =====
     handleInviteReply(reply) {
         const fromId = reply.from;
         if (reply.accepted) {
@@ -322,11 +321,7 @@ const Account = {
                 alert("您已在游戏中，无法开始新对局");
                 return;
             }
-            // 销毁旧的游戏 peer（如果有）
-            if (window.gamePeer) {
-                try { window.gamePeer.destroy(); } catch(e) {}
-                window.gamePeer = null;
-            }
+            // 销毁旧游戏连接
             if (window.conn) {
                 try { window.conn.close(); } catch(e) {}
                 window.conn = null;

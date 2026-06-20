@@ -1,7 +1,7 @@
 // ==================== 全局状态 ====================
 window.mode = "local";
 window.host = 0;
-window.conn = null;                 // 游戏连接（复用 window.peer）
+window.conn = null;
 window.board = [];
 window.cur = window.B;
 window.over = 0;
@@ -47,12 +47,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
 // ==================== 事件绑定 ====================
 function bindAllEvents() {
-    // 开始游戏
     $("btnStartGame").onclick = () => {
         $("modeModal").classList.add("show");
         $("btnStartGame").style.display = "none";
     };
-    // 挑战模式
     $("btnChallengeMode").onclick = () => {
         $("modeModal").classList.remove("show");
         $("diffModal").classList.add("show");
@@ -63,7 +61,7 @@ function bindAllEvents() {
         $("modeModal").classList.add("show");
     };
     $("startChallengeBtn").onclick = startChallenge;
-    // 模式选择
+
     document.querySelectorAll(".btn.mode[data-mode]").forEach(b => {
         b.onclick = () => {
             const m = b.dataset.mode;
@@ -85,7 +83,7 @@ function bindAllEvents() {
             }
         };
     });
-    // 技能卡片
+
     document.querySelectorAll(".skill-card").forEach(c => {
         c.onclick = () => {
             const s = c.dataset.skill;
@@ -126,7 +124,8 @@ function bindAllEvents() {
             }
         };
     });
-    // 技能按钮（爆破、复制、沉淀、引雷、领域、炮、坐杀、赌徒）
+
+    // 技能按钮
     $("btnBlast").onclick = () => {
         if (cantUse("blast")) return setStatus("当前无法使用爆破专家");
         if (window.cur === window.B && !total()) return setStatus("首回合禁止使用爆破专家");
@@ -401,7 +400,6 @@ function click(x, y) {
     if (window.D[window.cur].s === "redSpider") { setStatus("红蜘蛛正在接管，无法手动操作"); return; }
     if (window.mode === "ai" && window.cur === window.W) return;
 
-    // 炮选择
     if (window.D[window.cur].s === "cannon") {
         const v = window.board[y][x];
         if (isOwn(v, window.cur) && (v === window.B_CANNON || v === window.W_CANNON)) {
@@ -926,7 +924,7 @@ function backToMenu() {
     setStatus("请选择游戏模式");
 }
 
-// ==================== 联机功能（复用 window.peer） ====================
+// ==================== 联机功能 ====================
 function createRoom() {
     window.host = 1;
     window.mode = "online";
@@ -936,7 +934,6 @@ function createRoom() {
 function initPeerConnection(targetId, isHost) {
     showConnStatus("connecting", "连接中...");
 
-    // 关闭旧游戏连接
     if (window.conn) {
         try { window.conn.close(); } catch(e) {}
         window.conn = null;
@@ -958,10 +955,9 @@ function initPeerConnection(targetId, isHost) {
                 ]
             }
         });
-        // 设置消息监听（忽略游戏数据）
         window.peer.on("connection", (conn) => {
             conn.on("data", (data) => {
-                if (data.type === "game") return;  // 游戏数据由游戏处理
+                if (data.type === "game") return;
                 handlePeerData(data);
             });
         });
@@ -969,20 +965,18 @@ function initPeerConnection(targetId, isHost) {
     }
 
     if (isHost) {
-        // 房主：等待游戏连接（使用独立的监听器，不冲突）
-        window._waitingGame = true;
-        const onGameConn = (conn) => {
-            if (!window._waitingGame) return;
-            window._waitingGame = false;
-            // 接收游戏连接
+        // 房主监听游戏连接（使用 on，连接后立即移除监听）
+        const gameConnHandler = (conn) => {
+            if (window.conn) {
+                conn.close();
+                return;
+            }
             window.conn = conn;
-            // 监听游戏数据
             conn.on("data", (data) => {
                 if (data.type === "game") {
                     handleGameMessage(data.data);
                 }
             });
-            // 绑定连接关闭事件
             conn.on("close", () => {
                 showConnStatus("failed", "对方已断开");
                 if (!window.over) {
@@ -990,21 +984,18 @@ function initPeerConnection(targetId, isHost) {
                 }
             });
             $("modeModal").classList.remove("show");
-            selSkill();
+            selSkill();   // 关键：房主弹出技能选择框
             showConnStatus("connected", "已连接");
-            // 移除临时监听
-            window.peer.off("connection", onGameConn);
+            window.peer.off("connection", gameConnHandler);
         };
-        window.peer.on("connection", onGameConn);
+        window.peer.on("connection", gameConnHandler);
         setTimeout(() => {
-            if (window._waitingGame) {
-                window._waitingGame = false;
+            if (!window.conn) {
                 showConnStatus("failed", "等待连接超时");
-                window.peer.off("connection", onGameConn);
+                window.peer.off("connection", gameConnHandler);
             }
         }, 15000);
     } else {
-        // 客户端：主动连接
         const conn = window.peer.connect(targetId, { reliable: true });
         const timeout = setTimeout(() => {
             if (conn.open) conn.close();
@@ -1013,7 +1004,6 @@ function initPeerConnection(targetId, isHost) {
         conn.on("open", () => {
             clearTimeout(timeout);
             window.conn = conn;
-            // 监听游戏数据
             conn.on("data", (data) => {
                 if (data.type === "game") {
                     handleGameMessage(data.data);
@@ -1113,7 +1103,7 @@ function showConnStatus(type, text) {
 
 function myTurn() { return window.mode !== "online" || window.cur === (window.host ? window.B : window.W); }
 
-// ==================== 统计（忽略错误） ====================
+// ==================== 统计 ====================
 function fetchOnline() {
     fetch("https://api.countapi.xyz/hit/gomoku-skill-game/visitors")
         .then(r => r.json())
