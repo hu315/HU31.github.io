@@ -75,17 +75,15 @@ const Account = {
         return JSON.parse(localStorage.getItem(key) || "[]");
     },
 
-   // 在 Account 对象中找到 _addFriendDirect，替换为以下代码：
-_addFriendDirect(userId, remark) {
-    const friends = this.getFriends();
-    if (friends.find(f => f.userId === userId)) return false;
-    friends.push({ userId, remark: remark || `玩家${userId}` });
-    const key = `friends_${this.currentUser.userId}`;
-    localStorage.setItem(key, JSON.stringify(friends));
-    // 强制立即刷新好友列表（使用 setTimeout 确保 DOM 更新）
-    setTimeout(() => this.renderFriendList(), 50);
-    return true;
-},
+    _addFriendDirect(userId, remark) {
+        const friends = this.getFriends();
+        if (friends.find(f => f.userId === userId)) return false;
+        friends.push({ userId, remark: remark || `玩家${userId}` });
+        const key = `friends_${this.currentUser.userId}`;
+        localStorage.setItem(key, JSON.stringify(friends));
+        this.renderFriendList();
+        return true;
+    },
 
     removeFriend(userId) {
         let friends = this.getFriends().filter(f => f.userId !== userId);
@@ -227,7 +225,7 @@ _addFriendDirect(userId, remark) {
         });
     },
 
-    // ===== 底层数据发送（使用消息专用 peer） =====
+    // ===== 底层数据发送 =====
     sendDataToUser(targetUserId, data, callback) {
         if (!window.peer || window.peer.destroyed) {
             window.peer = new Peer(Account.currentUser.userId, {
@@ -247,7 +245,7 @@ _addFriendDirect(userId, remark) {
             window.peer.on("connection", (conn) => {
                 conn.on("data", (d) => {
                     if (d.type === "game") return;
-                    handlePeerData(d);
+                    handlePeerData(d, conn);
                 });
             });
             window.peer.on("error", (err) => console.error("消息 Peer 错误:", err));
@@ -282,37 +280,34 @@ _addFriendDirect(userId, remark) {
         });
     },
 
-    // ===== 处理好友申请回复（修复：确保添加并刷新） =====
+    // ===== 处理好友申请回复 =====
     handleFriendRequestReply(reply) {
         const fromId = reply.from;
         if (reply.accepted) {
-            // 使用 Account 直接调用，确保 this 正确
-            Account._addFriendDirect(fromId, reply.remark || `玩家${fromId}`);
-            // 更新消息状态
-            const msgs = Account.getMessages();
+            this._addFriendDirect(fromId, reply.remark || `玩家${fromId}`);
+            const msgs = this.getMessages();
             const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === fromId && !m.reply);
             if (idx !== -1) {
                 msgs[idx].reply = true;
                 msgs[idx].accepted = true;
-                Account.saveMessages(msgs);
+                this.saveMessages(msgs);
             }
-            Account.addMessage({
+            this.addMessage({
                 type: "system",
                 content: `已与 ${reply.remark || fromId} 成为好友`
             });
-            // 再次刷新列表（确保）
-            Account.renderFriendList();
-            Account.updateMessageBadge();
+            this.renderFriendList();
+            this.updateMessageBadge();
             alert(`已与 ${reply.remark || fromId} 成为好友`);
         } else {
-            const msgs = Account.getMessages();
+            const msgs = this.getMessages();
             const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === fromId && !m.reply);
             if (idx !== -1) {
                 msgs[idx].reply = true;
                 msgs[idx].accepted = false;
-                Account.saveMessages(msgs);
+                this.saveMessages(msgs);
             }
-            Account.updateMessageBadge();
+            this.updateMessageBadge();
             alert(`对方拒绝了您的好友申请`);
         }
     },

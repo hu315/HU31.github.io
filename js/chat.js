@@ -107,13 +107,12 @@ const Chat = {
     }
 };
 
-// ===== 显示自定义确认弹窗（替代 window.confirm） =====
+// ===== 显示自定义确认弹窗 =====
 function showConfirmModal(title, message, onAccept, onReject) {
     const modal = document.getElementById("confirmModal");
     document.getElementById("confirmTitle").textContent = title;
     document.getElementById("confirmMessage").textContent = message;
 
-    // 清除旧事件
     const acceptBtn = document.getElementById("confirmAccept");
     const rejectBtn = document.getElementById("confirmReject");
     const newAccept = acceptBtn.cloneNode(true);
@@ -133,10 +132,9 @@ function showConfirmModal(title, message, onAccept, onReject) {
     modal.classList.add("show");
 }
 
-// ===== 处理通过 peer 连接收到的非游戏数据 =====
-function handlePeerData(data) {
+// ===== 处理收到的数据 =====
+function handlePeerData(data, conn) {
     if (data.type === "friendRequest") {
-        // 记录到消息中心
         Account.addMessage({
             type: "friendRequest",
             from: data.from,
@@ -148,12 +146,12 @@ function handlePeerData(data) {
         Account.updateMessageBadge();
         setStatus(`收到来自 ${data.fromName} 的好友申请`);
 
-        // 使用自定义模态框
         showConfirmModal(
             "好友申请",
             `用户 ${data.fromName} (ID: ${data.from}) 申请添加您为好友，是否同意？`,
             () => { // 同意
                 const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: true, remark: Account.currentUser.username };
+                // 统一使用 sendDataToUser 发送回复，确保可靠
                 Account.sendDataToUser(data.from, reply, () => {});
                 Account._addFriendDirect(data.from, data.remark || `玩家${data.from}`);
                 const msgs = Account.getMessages();
@@ -183,7 +181,6 @@ function handlePeerData(data) {
         );
     }
     else if (data.type === "invite") {
-        // 记录到消息中心
         Account.addMessage({
             type: "invite",
             from: data.from,
@@ -193,23 +190,19 @@ function handlePeerData(data) {
         });
         Account.updateMessageBadge();
 
-        // 如果正在游戏中，提示并拒绝
         if (window.isInGame) {
-            alert("您正在游戏中，无法接受对战邀请，已自动拒绝。");
             const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: false, reason: "对方正在游戏中" };
             Account.sendDataToUser(data.from, reply, () => {});
             setStatus(`自动拒绝 ${data.fromName} 的对战邀请（您正在游戏中）`);
             return;
         }
 
-        // 使用自定义模态框
         showConfirmModal(
             "对战邀请",
             `用户 ${data.fromName} (ID: ${data.from}) 邀请您进行对战，是否接受？`,
             () => { // 接受
                 const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: true };
                 Account.sendDataToUser(data.from, reply, () => {});
-                // 清理旧连接
                 if (window.conn) {
                     try { window.conn.close(); } catch(e) {}
                     window.conn = null;
@@ -339,7 +332,6 @@ function afterLogin() {
         setStatus(`欢迎回来，${Account.currentUser.username}`);
         hideAllModals();
 
-        // 初始化消息 peer
         if (!window.peer || window.peer.destroyed) {
             window.peer = new Peer(Account.currentUser.userId, {
                 host: '0.peerjs.com',
@@ -358,7 +350,7 @@ function afterLogin() {
             window.peer.on("connection", (conn) => {
                 conn.on("data", (data) => {
                     if (data.type === "game") return;
-                    handlePeerData(data);
+                    handlePeerData(data, conn);
                 });
             });
             window.peer.on("error", (err) => console.error("消息 Peer 错误:", err));
@@ -378,7 +370,7 @@ function hideAllModals() {
     });
 }
 
-// ===== 渲染消息面板（含删除功能） =====
+// ===== 渲染消息面板 =====
 function renderMessageModal() {
     const container = document.getElementById("messageList");
     const msgs = Account.getMessages();
@@ -386,7 +378,6 @@ function renderMessageModal() {
         container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">暂无消息</p>';
         return;
     }
-    // 标记所有消息为已读
     msgs.forEach(msg => { msg.read = true; });
     Account.saveMessages(msgs);
     Account.updateMessageBadge();
@@ -440,7 +431,6 @@ function renderMessageModal() {
     });
     container.innerHTML = html;
 
-    // 绑定操作事件
     container.querySelectorAll("[data-action]").forEach(btn => {
         btn.onclick = () => {
             const action = btn.dataset.action;

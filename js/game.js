@@ -33,6 +33,8 @@ window.blastRange = 1;
 window.copyMax = 4;
 window.shieldActive = false;
 window.isInGame = false;
+window._sendingTurnEnd = false;
+window._turnEndPending = false;
 
 // ==================== 初始化 ====================
 document.addEventListener("DOMContentLoaded", function() {
@@ -125,7 +127,7 @@ function bindAllEvents() {
         };
     });
 
-    // 技能按钮（完整）
+    // 技能按钮
     $("btnBlast").onclick = () => {
         if (cantUse("blast")) return setStatus("当前无法使用爆破专家");
         if (window.cur === window.B && !total()) return setStatus("首回合禁止使用爆破专家");
@@ -570,7 +572,7 @@ function drop(x,y) {
     render();
     const win = checkWin(x, y, window.cur);
     if (win) {
-        if (myTurn() && window.mode !== "local") sendGame("move", {x,y, endTurn:false, win:true, extra:window.extra, dr:window.D[window.cur].dr});
+        if (myTurn() && window.mode !== "local") sendGame("move", {x,y, endTurn:false, win:true, extra:window.extra, dr:window.D[window.cur].dr, se:window.D[window.cur].se});
         return endGame(window.cur);
     }
     let willEndTurn = true;
@@ -591,7 +593,7 @@ function drop(x,y) {
         } else willEndTurn = false;
         upUI();
     }
-    if (myTurn() && window.mode !== "local") sendGame("move", {x,y, endTurn:willEndTurn, win:false, extra:window.extra, dr:window.D[window.cur].dr});
+    if (myTurn() && window.mode !== "local") sendGame("move", {x,y, endTurn:willEndTurn, win:false, extra:window.extra, dr:window.D[window.cur].dr, se:window.D[window.cur].se});
     if (willEndTurn) endTurn();
     else if (window.D[window.cur].s === "redSpider" || (window.mode === "ai" && window.cur === window.W)) setTimeout(()=>autoPlay(window.cur), 500);
 }
@@ -602,14 +604,14 @@ function gamblerDrop(x,y) {
     render();
     const win = checkWin(x, y, window.cur);
     if (win) {
-        if (myTurn() && window.mode !== "local") sendGame("move", {x,y, endTurn:false, win:true, extra:window.extra, dr:window.D[window.cur].dr});
+        if (myTurn() && window.mode !== "local") sendGame("move", {x,y, endTurn:false, win:true, extra:window.extra, dr:window.D[window.cur].dr, se:window.D[window.cur].se});
         return endGame(window.cur);
     }
     let willEndTurn = false;
     window.extra--;
     if (window.extra <= 0) willEndTurn = true;
     else setStatus(`剩余落子 ${window.extra} 次，点击棋盘继续落子`);
-    if (myTurn() && window.mode !== "local") sendGame("move", {x,y, endTurn:willEndTurn, win:false, extra:window.extra, dr:window.D[window.cur].dr});
+    if (myTurn() && window.mode !== "local") sendGame("move", {x,y, endTurn:willEndTurn, win:false, extra:window.extra, dr:window.D[window.cur].dr, se:window.D[window.cur].se});
     if (willEndTurn) endTurn();
     else if (window.D[window.cur].s === "redSpider" || (window.mode === "ai" && window.cur === window.W)) setTimeout(()=>autoPlay(window.cur), 500);
 }
@@ -622,7 +624,7 @@ function placeB(x,y,isC) {
     if (isC) {
         window.D[window.cur].c--;
         window.phase = "normal";
-        if (myTurn() && window.mode !== "local") sendGame("skill", {name:"blast", x, y});
+        if (myTurn() && window.mode !== "local") sendGame("skill", {name:"blast", x, y, l:1});
         setStatus("爆破标记已放置");
         render(); upUI(); endTurn();
     }
@@ -721,7 +723,21 @@ function updateStatusText() {
     if (window.D[window.cur].s === "redSpider") txt += "\n红蜘蛛正在接管操作...";
     setStatus(txt);
 }
+
+// ==================== 回合结束（带同步） ====================
 function endTurn() {
+    // 如果是联机且是自己回合，发送回合结束消息（防止死循环）
+    if (window.mode === "online" && myTurn() && !window._sendingTurnEnd && !window._turnEndPending) {
+        window._sendingTurnEnd = true;
+        sendGame("turnEnd", {});
+        setTimeout(() => { window._sendingTurnEnd = false; }, 100);
+    }
+    // 如果已经通过消息接收到了 turnEnd，则直接执行，不重复发送
+    if (window._turnEndPending) {
+        window._turnEndPending = false;
+    }
+
+    // 原有结束回合逻辑
     window.wheelResult = "";
     if (window.dom.a && window.cur===window.dom.o) { window.dom.l--; if (window.dom.l<=0) closeD(); }
     window.bombs.forEach(m => { if (m.o!==window.cur && !(window.dom.a && m.o!==window.dom.o)) m.l--; });
@@ -787,9 +803,28 @@ function autoPlay(pl) {
                 const s = skills[Math.floor(Math.random()*skills.length)];
                 if (s==="blast") {
                     const p = bestBPos(pl===window.B?window.W:window.B);
-                    if (p) { window.bombs.push({x:p.x,y:p.y,o:pl,l:1}); skillObj.blast--; setStatus("红蜘蛛放置了爆破标记"); render(); setTimeout(endTurn,600); return; }
-                } else if (s==="thunder") { castTFor(pl); skillObj.thunder--; return; }
-                else if (s==="sediment") { window.D[pl].se++; setStatus("红蜘蛛选择沉淀蓄力"); upUI(); setTimeout(endTurn,600); return; }
+                    if (p) {
+                        if (myTurn() && window.mode !== "local") {
+                            sendGame("skill", {name:"blast", x:p.x, y:p.y, l:1});
+                        }
+                        window.bombs.push({x:p.x, y:p.y, o:pl, l:1});
+                        skillObj.blast--;
+                        setStatus("红蜘蛛放置了爆破标记");
+                        render();
+                        setTimeout(endTurn, 600);
+                        return;
+                    }
+                } else if (s==="thunder") {
+                    castTFor(pl);
+                    skillObj.thunder--;
+                    return;
+                } else if (s==="sediment") {
+                    window.D[pl].se++;
+                    setStatus("红蜘蛛选择沉淀蓄力");
+                    upUI();
+                    setTimeout(endTurn, 600);
+                    return;
+                }
             }
         } else {
             if (mainSkill==="blast" && window.D[pl].c>0) { const p=bestBPos(pl===window.B?window.W:window.B); if (p) { placeB(p.x,p.y,1); return; } }
@@ -809,6 +844,7 @@ function autoPlay(pl) {
     if (pos) drop(pos.x,pos.y);
     if (window.extra>0 && window.phase==="normal" && !window.over && window.cur===pl) setTimeout(()=>autoPlay(pl), 500);
 }
+
 function castTFor(pl) {
     const n = Math.floor(Math.random()*16)+25;
     const all=[], posSet=new Set();
@@ -823,6 +859,9 @@ function castTFor(pl) {
         if (c===window.EMP) return;
         if (!(isOwn(c,pl) && Math.random()<0.4)) hit.push(p);
     });
+    if (myTurn() && window.mode !== "local") {
+        sendGame("skill", {name:"thunder", hit, all, win:false});
+    }
     execT(hit, all, 0);
     setStatus("红蜘蛛发动了引雷");
     setTimeout(endTurn, 700);
@@ -939,7 +978,6 @@ function initPeerConnection(targetId, isHost) {
         window.conn = null;
     }
 
-    // 确保消息 peer 存在
     if (!window.peer || window.peer.destroyed) {
         window.peer = new Peer(Account.currentUser.userId, {
             host: '0.peerjs.com',
@@ -958,15 +996,13 @@ function initPeerConnection(targetId, isHost) {
         window.peer.on("connection", (conn) => {
             conn.on("data", (data) => {
                 if (data.type === "game") return;
-                handlePeerData(data);
+                handlePeerData(data, conn);
             });
         });
         window.peer.on("error", (err) => console.error("消息 Peer 错误:", err));
     }
 
     if (isHost) {
-        // 房主监听游戏连接
-        // 使用 on 而不是 once，确保捕获到连接后立即调用 selSkill
         const gameConnHandler = (conn) => {
             if (window.conn) {
                 conn.close();
@@ -984,11 +1020,9 @@ function initPeerConnection(targetId, isHost) {
                     setTimeout(() => { alert("对方已断开连接"); $("btnBack").click(); }, 1000);
                 }
             });
-            // 关键：立即弹出技能选择框
             $("modeModal").classList.remove("show");
             selSkill();
             showConnStatus("connected", "已连接");
-            // 移除监听，只接受一次游戏连接
             window.peer.off("connection", gameConnHandler);
         };
         window.peer.on("connection", gameConnHandler);
@@ -1040,6 +1074,7 @@ function handleGameMessage(d) {
         window.board[d.payload.y][d.payload.x] = window.cur;
         if (d.payload.extra !== undefined) window.extra = d.payload.extra;
         if (d.payload.dr !== undefined) window.D[window.cur].dr = d.payload.dr;
+        if (d.payload.se !== undefined) window.D[window.cur].se = d.payload.se;
         if (!d.payload.endTurn) {
             if (window.extra > 0) {
                 window.phase = "gamblerDrop";
@@ -1074,24 +1109,50 @@ function handleGameMessage(d) {
         }
     } else if (d.type === "skill") {
         const s = d.payload;
-        if (s.name === "blast") { placeB(s.x, s.y, 0); render(); upUI(); endTurn(); }
-        else if (s.name === "cannon") { window.board[s.y][s.x] = window.cur===window.B ? window.B_CANNON : window.W_CANNON; render(); upUI(); endTurn(); }
-        else if (s.name === "sediment") { window.D[window.cur].se++; upUI(); endTurn(); }
-        else if (s.name === "thunder") { execT(s.hit, s.all, 0); upUI(); if (s.win) return endGame(window.cur); setTimeout(endTurn, 400); }
-        else if (s.name === "copy") { s.targets.forEach(t => window.board[t.y][t.x] = window.cur); render(); addFx(s.targets, "copy", 500); upUI(); if (s.win) return endGame(window.cur); endTurn(); }
-        else if (s.name === "sitKill") { s.removed.forEach(p => window.board[p.y][p.x] = window.EMP); window.bombs = window.bombs.filter(b => !s.removed.some(h => h.x===b.x && h.y===b.y)); render(); addFx(s.removed, "blast", 500); upUI(); if (s.win) return endGame(window.cur); setTimeout(endTurn, 600); }
-        else if (s.name === "cannonAttack") {
+        if (s.name === "blast") {
+            if (!window.bombs.some(m => m.x===s.x && m.y===s.y)) {
+                window.bombs.push({x:s.x, y:s.y, o:window.cur, l:s.l || 1});
+            }
+            render();
+        } else if (s.name === "cannon") {
+            window.board[s.y][s.x] = window.cur===window.B ? window.B_CANNON : window.W_CANNON;
+            render();
+        } else if (s.name === "sediment") {
+            window.D[window.cur].se++;
+            upUI();
+        } else if (s.name === "thunder") {
+            execT(s.hit, s.all, 0);
+            upUI();
+            if (s.win) return endGame(window.cur);
+        } else if (s.name === "copy") {
+            s.targets.forEach(t => window.board[t.y][t.x] = window.cur);
+            render();
+            addFx(s.targets, "copy", 500);
+            upUI();
+            if (s.win) return endGame(window.cur);
+        } else if (s.name === "sitKill") {
+            s.removed.forEach(p => window.board[p.y][p.x] = window.EMP);
+            window.bombs = window.bombs.filter(b => !s.removed.some(h => h.x===b.x && h.y===b.y));
+            render();
+            addFx(s.removed, "blast", 500);
+            upUI();
+            if (s.win) return endGame(window.cur);
+        } else if (s.name === "cannonAttack") {
             const type = window.cur===window.B ? window.B_CANNON : window.W_CANNON;
             window.board[s.yt][s.xt] = window.EMP;
             window.board[s.y0][s.x0] = window.EMP;
             window.board[s.yt][s.xt] = type;
-            render(); addFx([{x:s.xt,y:s.yt}], "blast", 500);
+            render();
+            addFx([{x:s.xt,y:s.yt}], "blast", 500);
             if (s.win) return endGame(window.cur);
-            setTimeout(endTurn, 600);
         }
     } else if (d.type === "domain") {
         openD(d.payload, 0);
         upUI();
+    } else if (d.type === "turnEnd") {
+        // 接收方执行回合结束，但不再发送 turnEnd
+        window._turnEndPending = true;
+        endTurn();
     }
 }
 
