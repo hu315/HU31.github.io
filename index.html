@@ -53,9 +53,7 @@
 </div>
 </div>
 
-<!-- ===== 所有模态框 ===== -->
-
-<!-- 模式选择 -->
+<!-- ===== 模态框 ===== -->
 <div id="modeModal" class="modal"><div class="modal-box" style="min-width:400px">
 <h3>选择游戏模式</h3>
 <div class="mode-list">
@@ -66,10 +64,9 @@
 <button class="btn challenge" id="btnChallengeMode">🔥 困难闯关模式</button>
 </div>
 <div id="createArea" style="display:none"><p>你的房间号：</p><div class="room-id" id="roomId">生成中...</div><p>等待对手加入中...</p></div>
-<div id="joinArea" style="display:none"><input class="input" id="joinInput" placeholder="请输入对方房间号"><button class="btn mode" id="joinBtn">加入房间</button></div>
+<div id="joinArea" style="display:none"><input class="input" id="joinInput" placeholder="请输入对方6位玩家ID"><button class="btn mode" id="joinBtn">加入房间</button></div>
 </div></div>
 
-<!-- 闯关难度选择 -->
 <div id="diffModal" class="modal"><div class="modal-box" style="min-width:520px">
 <h3>选择闯关难度</h3>
 <p style="color:#666;font-size:13px">每个难度连续挑战3局，难度逐局提升，胜利可获得增益奖励</p>
@@ -81,21 +78,18 @@
 </div>
 </div></div>
 
-<!-- 奖励选择 -->
 <div id="rewardModal" class="modal"><div class="modal-box" style="min-width:520px">
 <h3 class="result-title win">本局胜利！</h3>
 <p>选择一项增益奖励，继续下一局挑战</p>
 <div class="reward-grid" id="rewardGrid"></div>
 </div></div>
 
-<!-- 结果展示 -->
 <div id="resultModal" class="modal"><div class="modal-box">
 <div class="result-title" id="resultTitle">胜利</div>
 <div class="result-info" id="resultInfo"></div>
 <div class="btn-group" id="resultBtns"></div>
 </div></div>
 
-<!-- 技能选择 -->
 <div id="skillModal" class="modal"><div class="modal-box" style="min-width:560px">
 <h3 id="skillTip">选择你的技能</h3>
 <div class="skill-list">
@@ -110,7 +104,6 @@
 <div class="skill-card" data-skill="redSpider"><h4>红蜘蛛</h4><p>开局自动召唤，自带3个技能，全程自动下棋自动放技能</p><p class="num">全程自动 | 无法手动操作 | 中等强度</p></div>
 </div></div></div>
 
-<!-- 转盘 -->
 <div id="wheelModal" class="modal"><div class="modal-box">
 <h3>赌徒转盘</h3>
 <p style="color:#666;font-size:13px;margin-bottom:15px">转动后自动生效，获得落子机会需手动落子</p>
@@ -128,7 +121,6 @@
 <button id="spinBtn">开始转动</button>
 </div></div>
 
-<!-- 登录注册 -->
 <div class="modal" id="loginModal">
     <div class="modal-box">
         <h3>账号登录</h3>
@@ -152,7 +144,6 @@
     </div>
 </div>
 
-<!-- 好友侧边栏 -->
 <div class="friend-panel">
     <div class="friend-header">
         <span>好友列表</span>
@@ -171,7 +162,6 @@
     </div>
 </div>
 
-<!-- ===== 消息面板 ===== -->
 <div class="modal" id="messageModal">
     <div class="modal-box" style="min-width:360px; max-height:70vh; overflow-y:auto; position:relative;">
         <button id="closeMessageModal" style="position:absolute; top:10px; right:15px; background:none; border:none; font-size:24px; cursor:pointer; color:#999;">&times;</button>
@@ -180,7 +170,6 @@
     </div>
 </div>
 
-<!-- ===== 通用确认模态框（新增） ===== -->
 <div class="modal" id="confirmModal">
     <div class="modal-box" style="min-width:320px;">
         <h3 id="confirmTitle">确认</h3>
@@ -192,7 +181,6 @@
     </div>
 </div>
 
-<!-- 聊天窗口 -->
 <div class="chat-window" id="chatWindow" style="display:none">
     <div class="chat-header">
         <span id="chatTargetName">好友</span>
@@ -205,7 +193,6 @@
     </div>
 </div>
 
-<!-- 添加好友弹窗 -->
 <div class="modal" id="addFriendModal">
     <div class="modal-box" style="min-width:280px">
         <h3>添加好友</h3>
@@ -219,7 +206,6 @@
     </div>
 </div>
 
-<!-- 修改账号弹窗 -->
 <div class="modal" id="editUserModal">
     <div class="modal-box" style="min-width:300px">
         <h3 id="editUserTitle">修改账号</h3>
@@ -233,10 +219,11 @@
     </div>
 </div>
 
+<!-- 脚本加载顺序：config, utils, game, account, chat -->
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/game.js"></script>
 <script src="js/account.js"></script>
 <script src="js/chat.js"></script>
-<script src="js/game.js"></script>
 </body>
 </html>

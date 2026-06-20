@@ -206,13 +206,29 @@ const Account = {
         return { ok: true };
     },
 
-    // ===== 发送对战邀请 =====
+    // ===== 发送对战邀请（与房间号联机统一逻辑） =====
     sendInvite(targetUserId) {
         if (!this.currentUser) return;
         if (window.isInGame) {
             alert("您已在游戏中，无法发送邀请");
             return;
         }
+        // 清理旧连接
+        if (window.conn) {
+            try { window.conn.close(); } catch(e) {}
+            window.conn = null;
+        }
+        // 先成为房主（开始监听）
+        window.mode = "online";
+        window.host = 1;
+        // 调用 game.js 中的 initPeerConnection，传入 null 表示房主
+        if (typeof initPeerConnection === "function") {
+            initPeerConnection(null, true);
+        } else {
+            alert("游戏组件未加载，请刷新页面");
+            return;
+        }
+        // 发送邀请消息（通过临时数据连接）
         this.sendDataToUser(targetUserId, {
             type: "invite",
             from: this.currentUser.userId,
@@ -221,36 +237,21 @@ const Account = {
         }, (success) => {
             if (!success) {
                 alert("对方不在线或无法连接，请稍后再试");
+                // 取消房主状态
+                if (window.conn) { try { window.conn.close(); } catch(e) {} window.conn = null; }
+                if (window._hostTimer) { clearTimeout(window._hostTimer); window._hostTimer = null; }
+                if (typeof $ === "function") $("btnBack").click();
             }
         });
     },
 
-    // ===== 底层数据发送 =====
+    // ===== 底层数据发送（使用全局 peer，不再创建） =====
     sendDataToUser(targetUserId, data, callback) {
         if (!window.peer || window.peer.destroyed) {
-            window.peer = new Peer(Account.currentUser.userId, {
-                host: '0.peerjs.com',
-                port: 443,
-                path: '/',
-                secure: true,
-                debug: 0,
-                config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun.qq.com:3478' },
-                        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
-                    ]
-                }
-            });
-            window.peer.on("connection", (conn) => {
-                conn.on("data", (d) => {
-                    if (d.type === "game") return;
-                    handlePeerData(d, conn);
-                });
-            });
-            window.peer.on("error", (err) => console.error("消息 Peer 错误:", err));
+            console.error("Peer 未初始化，请重新登录");
+            if (callback) callback(false);
+            return;
         }
-
         const conn = window.peer.connect(targetUserId, { reliable: true });
         let connected = false;
         const timeout = setTimeout(() => {
@@ -280,10 +281,11 @@ const Account = {
         });
     },
 
-    // ===== 处理好友申请回复 =====
+    // ===== 处理好友申请回复（双方互加） =====
     handleFriendRequestReply(reply) {
         const fromId = reply.from;
         if (reply.accepted) {
+            // 双方都添加对方（本地存储）
             this._addFriendDirect(fromId, reply.remark || `玩家${fromId}`);
             const msgs = this.getMessages();
             const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === fromId && !m.reply);
@@ -320,16 +322,15 @@ const Account = {
                 alert("您已在游戏中，无法开始新对局");
                 return;
             }
-            if (window.conn) {
-                try { window.conn.close(); } catch(e) {}
-                window.conn = null;
-            }
-            window.mode = "online";
-            window.host = 1;
-            initPeerConnection(fromId, true);
+            // 对方已接受，我方作为房主已经处于等待状态，无需额外操作
+            // 但若连接尚未建立，则继续等待（由 initPeerConnection 处理）
         } else {
             const reason = reply.reason || "";
             alert(`对方拒绝了您的对战邀请${reason ? "：" + reason : ""}`);
+            // 取消房主状态
+            if (window.conn) { try { window.conn.close(); } catch(e) {} window.conn = null; }
+            if (window._hostTimer) { clearTimeout(window._hostTimer); window._hostTimer = null; }
+            if (typeof $ === "function") $("btnBack").click();
         }
     },
 

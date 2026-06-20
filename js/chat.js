@@ -150,10 +150,17 @@ function handlePeerData(data, conn) {
             "好友申请",
             `用户 ${data.fromName} (ID: ${data.from}) 申请添加您为好友，是否同意？`,
             () => { // 同意
-                const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: true, remark: Account.currentUser.username };
-                // 统一使用 sendDataToUser 发送回复，确保可靠
-                Account.sendDataToUser(data.from, reply, () => {});
+                // 接受方先添加发起方
                 Account._addFriendDirect(data.from, data.remark || `玩家${data.from}`);
+                // 发送回复（发起方收到后会添加接受方）
+                const reply = {
+                    type: "friendRequestReply",
+                    from: Account.currentUser.userId,
+                    accepted: true,
+                    remark: Account.currentUser.username
+                };
+                Account.sendDataToUser(data.from, reply, () => {});
+                // 更新消息状态
                 const msgs = Account.getMessages();
                 const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === data.from && !m.reply);
                 if (idx !== -1) {
@@ -164,9 +171,14 @@ function handlePeerData(data, conn) {
                 Account.renderFriendList();
                 Account.updateMessageBadge();
                 setStatus(`已添加 ${data.fromName} 为好友`);
+                alert(`已与 ${data.fromName} 成为好友`);
             },
             () => { // 拒绝
-                const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: false };
+                const reply = {
+                    type: "friendRequestReply",
+                    from: Account.currentUser.userId,
+                    accepted: false
+                };
                 Account.sendDataToUser(data.from, reply, () => {});
                 const msgs = Account.getMessages();
                 const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === data.from && !m.reply);
@@ -208,8 +220,10 @@ function handlePeerData(data, conn) {
                     window.conn = null;
                 }
                 window.mode = "online";
-                window.host = 0;
-                initPeerConnection(data.from, false);
+                window.host = 0;  // 接受方为客户端
+                if (typeof initPeerConnection === "function") {
+                    initPeerConnection(data.from, false);
+                }
                 setStatus("正在连接...");
             },
             () => { // 拒绝
@@ -332,6 +346,7 @@ function afterLogin() {
         setStatus(`欢迎回来，${Account.currentUser.username}`);
         hideAllModals();
 
+        // 创建全局 Peer（只创建一次）
         if (!window.peer || window.peer.destroyed) {
             window.peer = new Peer(Account.currentUser.userId, {
                 host: '0.peerjs.com',
@@ -447,9 +462,15 @@ function renderMessageModal() {
             }
 
             if (action === "acceptFriend") {
-                const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: true, remark: Account.currentUser.username };
-                Account.sendDataToUser(msg.from, reply, () => {});
+                // 接受方添加发起方
                 Account._addFriendDirect(msg.from, msg.remark || `玩家${msg.from}`);
+                const reply = {
+                    type: "friendRequestReply",
+                    from: Account.currentUser.userId,
+                    accepted: true,
+                    remark: Account.currentUser.username
+                };
+                Account.sendDataToUser(msg.from, reply, () => {});
                 msg.reply = true;
                 msg.accepted = true;
                 Account.saveMessages(msgs);
@@ -458,7 +479,11 @@ function renderMessageModal() {
                 renderMessageModal();
                 setStatus(`已添加 ${msg.fromName || msg.from} 为好友`);
             } else if (action === "rejectFriend") {
-                const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: false };
+                const reply = {
+                    type: "friendRequestReply",
+                    from: Account.currentUser.userId,
+                    accepted: false
+                };
                 Account.sendDataToUser(msg.from, reply, () => {});
                 msg.reply = true;
                 msg.accepted = false;
@@ -484,7 +509,9 @@ function renderMessageModal() {
                 }
                 window.mode = "online";
                 window.host = 0;
-                initPeerConnection(msg.from, false);
+                if (typeof initPeerConnection === "function") {
+                    initPeerConnection(msg.from, false);
+                }
                 document.getElementById("messageModal").classList.remove("show");
             } else if (action === "rejectInvite") {
                 const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: false, reason: "用户拒绝" };
