@@ -75,16 +75,17 @@ const Account = {
         return JSON.parse(localStorage.getItem(key) || "[]");
     },
 
-    // ★★★ 修改点：添加好友后立即刷新列表 ★★★
-    _addFriendDirect(userId, remark) {
-        const friends = this.getFriends();
-        if (friends.find(f => f.userId === userId)) return false;
-        friends.push({ userId, remark: remark || `玩家${userId}` });
-        const key = `friends_${this.currentUser.userId}`;
-        localStorage.setItem(key, JSON.stringify(friends));
-        this.renderFriendList();  // <-- 新增，确保好友列表及时更新
-        return true;
-    },
+   // 在 Account 对象中找到 _addFriendDirect，替换为以下代码：
+_addFriendDirect(userId, remark) {
+    const friends = this.getFriends();
+    if (friends.find(f => f.userId === userId)) return false;
+    friends.push({ userId, remark: remark || `玩家${userId}` });
+    const key = `friends_${this.currentUser.userId}`;
+    localStorage.setItem(key, JSON.stringify(friends));
+    // 强制立即刷新好友列表（使用 setTimeout 确保 DOM 更新）
+    setTimeout(() => this.renderFriendList(), 50);
+    return true;
+},
 
     removeFriend(userId) {
         let friends = this.getFriends().filter(f => f.userId !== userId);
@@ -281,34 +282,37 @@ const Account = {
         });
     },
 
-    // ===== 处理好友申请回复 =====
+    // ===== 处理好友申请回复（修复：确保添加并刷新） =====
     handleFriendRequestReply(reply) {
         const fromId = reply.from;
         if (reply.accepted) {
-            this._addFriendDirect(fromId, reply.remark || `玩家${fromId}`);
-            const msgs = this.getMessages();
+            // 使用 Account 直接调用，确保 this 正确
+            Account._addFriendDirect(fromId, reply.remark || `玩家${fromId}`);
+            // 更新消息状态
+            const msgs = Account.getMessages();
             const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === fromId && !m.reply);
             if (idx !== -1) {
                 msgs[idx].reply = true;
                 msgs[idx].accepted = true;
-                this.saveMessages(msgs);
+                Account.saveMessages(msgs);
             }
-            this.addMessage({
+            Account.addMessage({
                 type: "system",
                 content: `已与 ${reply.remark || fromId} 成为好友`
             });
-            this.renderFriendList();
-            this.updateMessageBadge();
+            // 再次刷新列表（确保）
+            Account.renderFriendList();
+            Account.updateMessageBadge();
             alert(`已与 ${reply.remark || fromId} 成为好友`);
         } else {
-            const msgs = this.getMessages();
+            const msgs = Account.getMessages();
             const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === fromId && !m.reply);
             if (idx !== -1) {
                 msgs[idx].reply = true;
                 msgs[idx].accepted = false;
-                this.saveMessages(msgs);
+                Account.saveMessages(msgs);
             }
-            this.updateMessageBadge();
+            Account.updateMessageBadge();
             alert(`对方拒绝了您的好友申请`);
         }
     },
@@ -321,7 +325,6 @@ const Account = {
                 alert("您已在游戏中，无法开始新对局");
                 return;
             }
-            // 销毁旧游戏连接
             if (window.conn) {
                 try { window.conn.close(); } catch(e) {}
                 window.conn = null;

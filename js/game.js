@@ -125,7 +125,7 @@ function bindAllEvents() {
         };
     });
 
-    // 技能按钮
+    // 技能按钮（完整）
     $("btnBlast").onclick = () => {
         if (cantUse("blast")) return setStatus("当前无法使用爆破专家");
         if (window.cur === window.B && !total()) return setStatus("首回合禁止使用爆破专家");
@@ -965,7 +965,8 @@ function initPeerConnection(targetId, isHost) {
     }
 
     if (isHost) {
-        // 房主监听游戏连接（使用 on，连接后立即移除监听）
+        // 房主监听游戏连接
+        // 使用 on 而不是 once，确保捕获到连接后立即调用 selSkill
         const gameConnHandler = (conn) => {
             if (window.conn) {
                 conn.close();
@@ -983,9 +984,11 @@ function initPeerConnection(targetId, isHost) {
                     setTimeout(() => { alert("对方已断开连接"); $("btnBack").click(); }, 1000);
                 }
             });
+            // 关键：立即弹出技能选择框
             $("modeModal").classList.remove("show");
-            selSkill();   // 关键：房主弹出技能选择框
+            selSkill();
             showConnStatus("connected", "已连接");
+            // 移除监听，只接受一次游戏连接
             window.peer.off("connection", gameConnHandler);
         };
         window.peer.on("connection", gameConnHandler);

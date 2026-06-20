@@ -107,9 +107,36 @@ const Chat = {
     }
 };
 
+// ===== 显示自定义确认弹窗（替代 window.confirm） =====
+function showConfirmModal(title, message, onAccept, onReject) {
+    const modal = document.getElementById("confirmModal");
+    document.getElementById("confirmTitle").textContent = title;
+    document.getElementById("confirmMessage").textContent = message;
+
+    // 清除旧事件
+    const acceptBtn = document.getElementById("confirmAccept");
+    const rejectBtn = document.getElementById("confirmReject");
+    const newAccept = acceptBtn.cloneNode(true);
+    const newReject = rejectBtn.cloneNode(true);
+    acceptBtn.parentNode.replaceChild(newAccept, acceptBtn);
+    rejectBtn.parentNode.replaceChild(newReject, rejectBtn);
+
+    newAccept.onclick = () => {
+        modal.classList.remove("show");
+        if (onAccept) onAccept();
+    };
+    newReject.onclick = () => {
+        modal.classList.remove("show");
+        if (onReject) onReject();
+    };
+
+    modal.classList.add("show");
+}
+
 // ===== 处理通过 peer 连接收到的非游戏数据 =====
 function handlePeerData(data) {
     if (data.type === "friendRequest") {
+        // 记录到消息中心
         Account.addMessage({
             type: "friendRequest",
             from: data.from,
@@ -120,33 +147,40 @@ function handlePeerData(data) {
         });
         Account.updateMessageBadge();
         setStatus(`收到来自 ${data.fromName} 的好友申请`);
-        if (confirm(`收到好友申请来自 ${data.fromName} (ID: ${data.from})，是否同意？`)) {
-            const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: true, remark: Account.currentUser.username };
-            Account.sendDataToUser(data.from, reply, () => {});
-            Account._addFriendDirect(data.from, data.remark || `玩家${data.from}`);
-            const msgs = Account.getMessages();
-            const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === data.from && !m.reply);
-            if (idx !== -1) {
-                msgs[idx].reply = true;
-                msgs[idx].accepted = true;
-                Account.saveMessages(msgs);
+
+        // 使用自定义模态框
+        showConfirmModal(
+            "好友申请",
+            `用户 ${data.fromName} (ID: ${data.from}) 申请添加您为好友，是否同意？`,
+            () => { // 同意
+                const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: true, remark: Account.currentUser.username };
+                Account.sendDataToUser(data.from, reply, () => {});
+                Account._addFriendDirect(data.from, data.remark || `玩家${data.from}`);
+                const msgs = Account.getMessages();
+                const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === data.from && !m.reply);
+                if (idx !== -1) {
+                    msgs[idx].reply = true;
+                    msgs[idx].accepted = true;
+                    Account.saveMessages(msgs);
+                }
+                Account.renderFriendList();
+                Account.updateMessageBadge();
+                setStatus(`已添加 ${data.fromName} 为好友`);
+            },
+            () => { // 拒绝
+                const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: false };
+                Account.sendDataToUser(data.from, reply, () => {});
+                const msgs = Account.getMessages();
+                const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === data.from && !m.reply);
+                if (idx !== -1) {
+                    msgs[idx].reply = true;
+                    msgs[idx].accepted = false;
+                    Account.saveMessages(msgs);
+                }
+                Account.updateMessageBadge();
+                setStatus(`已拒绝 ${data.fromName} 的好友申请`);
             }
-            Account.renderFriendList();
-            Account.updateMessageBadge();
-            setStatus(`已添加 ${data.fromName} 为好友`);
-        } else {
-            const reply = { type: "friendRequestReply", from: Account.currentUser.userId, accepted: false };
-            Account.sendDataToUser(data.from, reply, () => {});
-            const msgs = Account.getMessages();
-            const idx = msgs.findIndex(m => m.type === "friendRequest" && m.from === data.from && !m.reply);
-            if (idx !== -1) {
-                msgs[idx].reply = true;
-                msgs[idx].accepted = false;
-                Account.saveMessages(msgs);
-            }
-            Account.updateMessageBadge();
-            setStatus(`已拒绝 ${data.fromName} 的好友申请`);
-        }
+        );
     }
     else if (data.type === "invite") {
         // 记录到消息中心
@@ -159,50 +193,38 @@ function handlePeerData(data) {
         });
         Account.updateMessageBadge();
 
-        // 第一步：弹出是否接受邀请（独立弹窗）
-        if (!confirm(`收到对战邀请来自 ${data.fromName} (ID: ${data.from})，是否接受？`)) {
-            // 用户拒绝
-            const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: false, reason: "用户拒绝" };
+        // 如果正在游戏中，提示并拒绝
+        if (window.isInGame) {
+            alert("您正在游戏中，无法接受对战邀请，已自动拒绝。");
+            const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: false, reason: "对方正在游戏中" };
             Account.sendDataToUser(data.from, reply, () => {});
-            setStatus(`已拒绝 ${data.fromName} 的对战邀请`);
+            setStatus(`自动拒绝 ${data.fromName} 的对战邀请（您正在游戏中）`);
             return;
         }
 
-        // 用户选择了接受，检查是否在游戏中
-        if (window.isInGame) {
-            // 询问是否退出当前游戏
-            if (!confirm(`您正在游戏中，接受邀请将退出当前对局，是否继续？`)) {
-                // 用户取消，相当于拒绝邀请
-                const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: false, reason: "用户取消（游戏中）" };
+        // 使用自定义模态框
+        showConfirmModal(
+            "对战邀请",
+            `用户 ${data.fromName} (ID: ${data.from}) 邀请您进行对战，是否接受？`,
+            () => { // 接受
+                const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: true };
                 Account.sendDataToUser(data.from, reply, () => {});
-                setStatus(`已拒绝 ${data.fromName} 的对战邀请（您在游戏中）`);
-                return;
+                // 清理旧连接
+                if (window.conn) {
+                    try { window.conn.close(); } catch(e) {}
+                    window.conn = null;
+                }
+                window.mode = "online";
+                window.host = 0;
+                initPeerConnection(data.from, false);
+                setStatus("正在连接...");
+            },
+            () => { // 拒绝
+                const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: false, reason: "用户拒绝" };
+                Account.sendDataToUser(data.from, reply, () => {});
+                setStatus(`已拒绝 ${data.fromName} 的对战邀请`);
             }
-            // 用户确认退出当前游戏
-            // 清理当前游戏
-            if (window.gamePeer) {
-                try { window.gamePeer.destroy(); } catch(e) {}
-                window.gamePeer = null;
-            }
-            if (window.conn) {
-                try { window.conn.close(); } catch(e) {}
-                window.conn = null;
-            }
-            // 重置游戏状态
-            window.isInGame = false;
-            // 可能还需要重置棋盘等，但 init 会在新游戏开始时执行
-            // 这里不调用 init，因为即将开始新对局
-            setStatus("已退出当前对局，准备接受邀请...");
-        }
-
-        // 发送接受回复
-        const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: true };
-        Account.sendDataToUser(data.from, reply, () => {});
-
-        // 开始新游戏连接（作为客户端）
-        window.mode = "online";
-        window.host = 0;
-        initPeerConnection(data.from, false);
+        );
     }
     else if (data.type === "chat") {
         Chat.receive(data.data);
@@ -221,7 +243,6 @@ document.addEventListener("DOMContentLoaded", function() {
         renderMessageModal();
         document.getElementById("messageModal").classList.add("show");
     };
-    // 右上角叉关闭
     document.getElementById("closeMessageModal").onclick = () => {
         document.getElementById("messageModal").classList.remove("show");
     };
@@ -357,7 +378,7 @@ function hideAllModals() {
     });
 }
 
-// ===== 渲染消息面板（已读标记 + 删除功能） =====
+// ===== 渲染消息面板（含删除功能） =====
 function renderMessageModal() {
     const container = document.getElementById("messageList");
     const msgs = Account.getMessages();
@@ -365,7 +386,7 @@ function renderMessageModal() {
         container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">暂无消息</p>';
         return;
     }
-    // 标记所有消息为已读，红点消失
+    // 标记所有消息为已读
     msgs.forEach(msg => { msg.read = true; });
     Account.saveMessages(msgs);
     Account.updateMessageBadge();
@@ -457,20 +478,8 @@ function renderMessageModal() {
                 setStatus(`已拒绝 ${msg.fromName || msg.from} 的好友申请`);
             } else if (action === "acceptInvite") {
                 if (window.isInGame) {
-                    if (!confirm("您正在游戏中，接受邀请将退出当前对局，是否继续？")) {
-                        return; // 用户取消，不发送任何回复（既未接受也未拒绝）
-                    }
-                    // 清理当前游戏
-                    if (window.gamePeer) {
-                        try { window.gamePeer.destroy(); } catch(e) {}
-                        window.gamePeer = null;
-                    }
-                    if (window.conn) {
-                        try { window.conn.close(); } catch(e) {}
-                        window.conn = null;
-                    }
-                    window.isInGame = false;
-                    setStatus("已退出当前对局");
+                    alert("您已在游戏中，无法接受邀请");
+                    return;
                 }
                 const reply = { type: "inviteReply", from: Account.currentUser.userId, accepted: true };
                 Account.sendDataToUser(msg.from, reply, () => {});
@@ -479,6 +488,10 @@ function renderMessageModal() {
                 Account.saveMessages(msgs);
                 Account.updateMessageBadge();
                 renderMessageModal();
+                if (window.conn) {
+                    try { window.conn.close(); } catch(e) {}
+                    window.conn = null;
+                }
                 window.mode = "online";
                 window.host = 0;
                 initPeerConnection(msg.from, false);
