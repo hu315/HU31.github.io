@@ -274,6 +274,8 @@ function init() {
             c.onclick = () => click(x, y);
             window.be.appendChild(c);
         }
+    // 添加星位标记（天元和8个星位）
+    addStarPoints();
     window.bombs = [];
     window.over = 0;
     window.cur = window.B;
@@ -290,24 +292,37 @@ function init() {
     window.be.classList.remove("domain");
     window.isInGame = false;
     window._skillSelectedSent = false;
+    // 显示开始游戏按钮
+    $("btnStartGame").style.display = "block";
     updateBoardBackground();
     render();
     upUI();
 }
 
+function addStarPoints() {
+    const starPositions = [
+        [3, 3], [3, 7], [3, 11],
+        [7, 3], [7, 7], [7, 11],
+        [11, 3], [11, 7], [11, 11]
+    ];
+    starPositions.forEach(([x, y]) => {
+        const star = document.createElement("div");
+        star.className = "star-point";
+        star.style.left = `${((x + 0.5) / window.S) * 100}%`;
+        star.style.top = `${((y + 0.5) / window.S) * 100}%`;
+        window.be.appendChild(star);
+    });
+}
+
 function updateBoardBackground() {
+    // 移除动态背景图片，使用 CSS ::before 伪元素绘制网格线
     const board = window.be;
     if (!board) return;
-    const size = board.getBoundingClientRect().width / window.S;
-    board.style.backgroundSize = size + "px " + size + "px";
-    board.style.backgroundPosition = (size / 2) + "px " + (size / 2) + "px";
-    board.style.backgroundImage = `
-        linear-gradient(to right, #8b7355 1px, transparent 1px),
-        linear-gradient(to bottom, #8b7355 1px, transparent 1px)
-    `;
+    board.style.backgroundImage = "none";
 }
 
 function selSkill() {
+    if (window.phase === "skillSelect") return;  // 防止重复调用
     $("btnStartGame").style.display = "none";
     window.phase = "skillSelect";
     $("skillModal").classList.add("show");
@@ -697,18 +712,32 @@ function closeD() { window.dom.a=0; window.be.classList.remove("domain"); setSta
 // ==================== 辅助 ====================
 function addFx(ps, fc, dur) { ps.forEach(p => { const c=window.be.children[p.y*window.S+p.x]; c.classList.add(fc); setTimeout(()=>c.classList.remove(fc), dur); }); }
 function render() {
+    if (!window.be || !window.board || !window.board.length) return;
     const cells = window.be.children;
     for (let i=0; i<cells.length; i++) {
         const x = i%window.S, y = Math.floor(i/window.S);
         const c = cells[i];
         const keepFx = ["blast","thunder","copy"].filter(f => c.classList.contains(f));
         c.className = "cell " + keepFx.join(" ");
-        c.textContent = "";
+        c.innerHTML = "";
+        if (!window.board[y] || typeof window.board[y][x] === 'undefined') continue;
         const v = window.board[y][x];
         if (v === window.B) c.classList.add("black");
         else if (v === window.W) c.classList.add("white");
-        else if (v === window.B_CANNON) c.classList.add("cannon-black");
-        else if (v === window.W_CANNON) c.classList.add("cannon-white");
+        else if (v === window.B_CANNON) { 
+            c.classList.add("cannon-black");
+            const text = document.createElement("span");
+            text.className = "cannon-text";
+            text.textContent = "炮";
+            c.appendChild(text);
+        }
+        else if (v === window.W_CANNON) { 
+            c.classList.add("cannon-white");
+            const text = document.createElement("span");
+            text.className = "cannon-text";
+            text.textContent = "炮";
+            c.appendChild(text);
+        }
         const m = window.bombs.find(b => b.x===x && b.y===y);
         if (m) { c.classList.add("bomb"); c.textContent = m.l; }
         if (window.cs.some(p => p.x===x && p.y===y)) c.classList.add("sel");
@@ -992,6 +1021,7 @@ function initPeerConnection(targetId, isHost) {
     cleanupConnection();
 
     if (isHost) {
+        window.host = 1;  // 显式设置为服务端（黑方）
         const gameConnHandler = (conn) => {
             if (window.conn) { conn.close(); return; }
             window.conn = conn;
@@ -1013,6 +1043,7 @@ function initPeerConnection(targetId, isHost) {
             window._hostTimer = null;
         }, 30000);
     } else {
+        window.host = 0;  // 显式设置为客户端（白方）
         const conn = window.peer.connect(targetId, { reliable: true });
         const timeout = setTimeout(() => {
             if (conn.open) conn.close();
@@ -1208,10 +1239,26 @@ function showConnStatus(type, text) {
 function myTurn() { return window.mode !== "online" || window.cur === (window.host ? window.B : window.W); }
 
 // ==================== 统计 ====================
-fetch("https://api.countapi.xyz/hit/gomoku-skill-game/visitors")
-    .then(r => r.json())
-    .then(d => { const oc=document.getElementById("oc"); if (oc) oc.textContent=`累计游玩人次：${d.value} 人`; })
-    .catch(()=>{});
+function loadVisitorCount() {
+    fetch("https://api.countapi.xyz/hit/gomoku-skill-game/visitors")
+        .then(r => {
+            if (!r.ok) throw new Error('Network response was not ok');
+            return r.json();
+        })
+        .then(d => { 
+            if (d && typeof d.value !== 'undefined') {
+                const oc = document.getElementById("oc"); 
+                if (oc) oc.textContent = `累计游玩人次：${d.value} 人`; 
+            }
+        })
+        .catch(err => {
+            console.log('Visitor count API unavailable:', err.message);
+            const oc = document.getElementById("oc");
+            if (oc) oc.textContent = '累计游玩人次：统计中...';
+        });
+}
+// DOM加载完成后再调用
+document.addEventListener("DOMContentLoaded", loadVisitorCount);
 
 // ==================== 鼠标事件 ====================
 function bindMouse() {

@@ -131,6 +131,9 @@ function handlePeerData(data, conn) {
             }
         );
     }
+    else if (data.type === "friendRequestReply") {
+        Account.handleFriendRequestReply(data);
+    }
     else if (data.type === "invite") {
         Account.addMessage({ type: "invite", from: data.from, fromName: data.fromName, time: data.time, reply: false });
         Account.updateMessageBadge();
@@ -160,6 +163,9 @@ function handlePeerData(data, conn) {
                 setStatus(`已拒绝 ${data.fromName} 的对战邀请`);
             }
         );
+    }
+    else if (data.type === "inviteReply") {
+        Account.handleInviteReply(data);
     }
     else if (data.type === "chat") {
         Chat.receive(data.data);
@@ -241,6 +247,60 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     document.getElementById("btnLogout").onclick = () => Account.logout();
+    
+    // 移动端好友面板事件绑定
+    document.getElementById("mobileFriendToggle")?.addEventListener("click", () => {
+        document.getElementById("mobileFriendPanel")?.classList.add("show");
+    });
+    
+    document.getElementById("mobileFriendClose")?.addEventListener("click", () => {
+        document.getElementById("mobileFriendPanel")?.classList.remove("show");
+    });
+    
+    document.getElementById("mobileAddFriend")?.addEventListener("click", () => {
+        document.getElementById("mobileFriendPanel")?.classList.remove("show");
+        document.getElementById("addFriendModal")?.classList.add("show");
+    });
+    
+    document.getElementById("mobileFriendPanel")?.addEventListener("click", (e) => {
+        if (e.target.id === "mobileFriendPanel") {
+            document.getElementById("mobileFriendPanel")?.classList.remove("show");
+        }
+    });
+    
+    // 响应式UI切换
+    function toggleResponsiveUI() {
+        const isMobile = window.innerWidth < 768;
+        
+        // 移动端UI
+        const mobileToggle = document.getElementById("mobileFriendToggle");
+        const mobilePanel = document.getElementById("mobileFriendPanel");
+        // 桌面端好友面板
+        const friendPanel = document.getElementById("friendPanel");
+        const sidebar = document.getElementById("sidebar");
+        
+        if (mobileToggle) {
+            mobileToggle.style.display = isMobile ? "flex" : "none";
+        }
+        
+        if (friendPanel) {
+            friendPanel.style.display = isMobile ? "none" : "block";
+        }
+        
+        if (sidebar) {
+            sidebar.style.display = isMobile ? "none" : "flex";
+        }
+        
+        // 如果是桌面端，确保移动端面板关闭
+        if (!isMobile && mobilePanel) {
+            mobilePanel.classList.remove("show");
+        }
+    }
+    
+    // 页面加载时执行一次
+    toggleResponsiveUI();
+    // 监听窗口大小变化
+    window.addEventListener("resize", toggleResponsiveUI);
 });
 
 function afterLogin() {
@@ -291,6 +351,15 @@ function afterLogin() {
 
         Account.addMessage({ type: "system", content: "🎉 欢迎使用技能五子棋 v2.0！" });
         Account.updateMessageBadge();
+        
+        // 更新移动端用户信息
+        const mobileUserInfo = document.getElementById("mobileUserInfo");
+        if (mobileUserInfo) {
+            mobileUserInfo.innerHTML = `
+                <span>${Account.currentUser.username} · ID: ${Account.currentUser.userId}</span>
+                <button class="btn-logout" onclick="Account.logout()">退出登录</button>
+            `;
+        }
     }
 }
 

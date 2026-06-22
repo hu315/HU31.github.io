@@ -79,43 +79,81 @@ const Account = {
 
     renderFriendList() {
         const list = this.getFriends();
+        
+        // 渲染桌面端好友列表
         const container = document.getElementById("friendList");
-        if (!container) return;
-        container.innerHTML = "";
-        if (list.length === 0) {
-            container.innerHTML = '<p style="text-align:center;color:#999;font-size:12px;padding:20px 0">暂无好友</p>';
-            return;
+        if (container) {
+            container.innerHTML = "";
+            if (list.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:#999;font-size:12px;padding:20px 0">暂无好友</p>';
+            } else {
+                list.forEach(f => {
+                    const item = document.createElement("div");
+                    item.className = "friend-item";
+                    item.innerHTML = `
+                        <div style="flex:1; min-width:0; overflow:hidden;">
+                            <div class="name">${f.remark}</div>
+                            <div class="id">ID: ${f.userId}</div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="chat-btn" data-id="${f.userId}">💬</button>
+                            <button class="invite-btn" data-id="${f.userId}">⚔️</button>
+                            <button class="del-btn" data-id="${f.userId}">×</button>
+                        </div>
+                    `;
+                    this.bindFriendItemEvents(item, f);
+                    container.appendChild(item);
+                });
+            }
         }
-        list.forEach(f => {
-            const item = document.createElement("div");
-            item.className = "friend-item";
-            item.innerHTML = `
-                <div style="flex:1; min-width:0;">
-                    <div class="name">${f.remark}</div>
-                    <div class="id">ID: ${f.userId}</div>
-                </div>
-                <div style="display:flex; gap:4px; flex-shrink:0;">
-                    <button class="chat-btn" data-id="${f.userId}" style="background:#2ecc71;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">💬</button>
-                    <button class="invite-btn" data-id="${f.userId}" style="background:#3498db;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">⚔️</button>
-                    <button class="del-btn" data-id="${f.userId}" style="background:#e74c3c;color:#fff;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:11px;">×</button>
-                </div>
-            `;
-            item.querySelector(".chat-btn").onclick = (e) => {
-                e.stopPropagation();
-                Chat.open(f.userId, f.remark);
-            };
-            item.querySelector(".invite-btn").onclick = (e) => {
-                e.stopPropagation();
-                Account.sendInvite(f.userId);
-            };
-            item.querySelector(".del-btn").onclick = (e) => {
-                e.stopPropagation();
-                if (confirm(`确定删除好友“${f.remark}”吗？`)) {
-                    this.removeFriend(f.userId);
-                }
-            };
-            container.appendChild(item);
-        });
+        
+        // 渲染移动端好友列表
+        const mobileContainer = document.getElementById("mobileFriendList");
+        if (mobileContainer) {
+            mobileContainer.innerHTML = "";
+            if (list.length === 0) {
+                mobileContainer.innerHTML = '<p style="text-align:center;color:#999;font-size:14px;padding:40px 0">暂无好友</p>';
+            } else {
+                list.forEach(f => {
+                    const item = document.createElement("div");
+                    item.className = "friend-item";
+                    item.innerHTML = `
+                        <div style="flex:1; min-width:0; overflow:hidden;">
+                            <div class="name">${f.remark}</div>
+                            <div class="id">ID: ${f.userId}</div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="chat-btn" data-id="${f.userId}">💬</button>
+                            <button class="invite-btn" data-id="${f.userId}">⚔️</button>
+                            <button class="del-btn" data-id="${f.userId}">×</button>
+                        </div>
+                    `;
+                    this.bindFriendItemEvents(item, f);
+                    mobileContainer.appendChild(item);
+                });
+            }
+        }
+    },
+    
+    bindFriendItemEvents(item, f) {
+        item.querySelector(".chat-btn").onclick = (e) => {
+            e.stopPropagation();
+            // 关闭移动端面板
+            document.getElementById("mobileFriendPanel")?.classList.remove("show");
+            Chat.open(f.userId, f.remark);
+        };
+        item.querySelector(".invite-btn").onclick = (e) => {
+            e.stopPropagation();
+            // 关闭移动端面板
+            document.getElementById("mobileFriendPanel")?.classList.remove("show");
+            Account.sendInvite(f.userId);
+        };
+        item.querySelector(".del-btn").onclick = (e) => {
+            e.stopPropagation();
+            if (confirm(`确定删除好友“${f.remark}”吗？`)) {
+                this.removeFriend(f.userId);
+            }
+        };
     },
 
     // ===== 消息系统 =====
@@ -244,7 +282,10 @@ const Account = {
     // ===== 处理对战邀请回复 =====
     handleInviteReply(reply) {
         if (reply.accepted) {
-            // 对方已接受，房主已经在等待连接，无需额外操作
+            // 连接已经在 sendInvite 中初始化，这里不需要再次初始化
+            // 只需等待对方连接即可
+            $("modeModal").classList.remove("show");
+            alert("对方已接受邀请，等待连接...");
         } else {
             const reason = reply.reason || "";
             alert(`对方拒绝了您的对战邀请${reason ? "：" + reason : ""}`);
